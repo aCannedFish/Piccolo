@@ -52,7 +52,7 @@ Piccolo/
 │   │   ├── meta_parser/        基于 Clang 的反射代码生成工具
 │   │   ├── precompile/         反射生成的 CMake 配置与输入列表
 │   │   ├── _generated/         自动生成的反射和序列化代码
-│   │   └── test/               测试目录，当前 CMake 未启用
+│   │   └── test/               上游保留目录，当前 CMake 未启用
 │   ├── shader/
 │   │   ├── glsl/               顶点、片元、几何和计算 shader
 │   │   ├── include/            shader 共用结构、常量和光照计算
@@ -163,7 +163,9 @@ WorldManager
 | 粒子管理 | [function/particle/](engine/source/runtime/function/particle/) | `ParticleManager` 读取全局粒子配置，组织发射器描述和创建请求；GPU 模拟位于渲染 Pass 与计算 shader |
 | UI 接口 | [function/ui/](engine/source/runtime/function/ui/) | `WindowUI` 定义 `initialize()` 和 `preRender()`，由编辑器实现界面内容 |
 
-追踪角色移动时，可以按 `InputSystem → MotorComponent → CharacterController → PhysicsScene → TransformComponent` 阅读。追踪骨骼动画时，可以按 `AnimationComponent → AnimationManager → Skeleton → MeshComponent → mesh.vert` 阅读。
+追踪角色移动时，可以按 `InputSystem → MotorComponent → CharacterController → PhysicsScene → TransformComponent` 阅读。控制器分开扫描竖直和水平位移，向 Motor 返回落地与触顶状态。追踪骨骼动画时，可以按 `AnimationComponent → AnimationFSM → AnimationManager → Skeleton → MeshComponent → mesh.vert` 阅读。状态资源决定播放片段，Skeleton 按逐骨骼权重混合局部变换。
+
+根目录 [tests/](tests/) 包含动画、控制器、反射回归测试，以及需显示设备的完整场景测试。构建和运行命令见 [README.md](README.md#运行测试)，各项实现说明见 [LOG.md](LOG.md)。
 
 ## 渲染模块
 
@@ -234,7 +236,7 @@ TransformComponent / AnimationComponent
 | 粒子模拟和绘制 | [particle_pass.cpp](engine/source/runtime/function/render/passes/particle_pass.cpp) | `particle_kickoff.comp`、`particle_emit.comp`、`particle_simulate.comp`、`particlebillboard.vert / .frag` |
 | 天空盒、编辑器操作轴 | `main_camera_pass.cpp` 中的 `drawSkybox()`、`drawAxis()` | `skybox.vert / .frag`、`axis.vert / .frag` |
 
-Tone Mapping、Color Grading 等后处理使用 [post_process.vert](engine/shader/glsl/post_process.vert) 绘制全屏三角形。当前 `color_grading.frag` 的 `main()` 直接输出输入颜色，是渲染作业需要补全的入口。
+Tone Mapping、Color Grading 等后处理使用 [post_process.vert](engine/shader/glsl/post_process.vert) 绘制全屏三角形。`color_grading.frag` 在横向排列的两个蓝色切片之间插值，红绿通道使用线性过滤，alpha 保留输入值。LUT 只创建一个 mip 层级，并显式采样第 0 层，避免切片间串色。默认暖色 LUT 由 [生成脚本](scripts/generate_color_lut.py) 生成。
 
 ### 共用代码
 

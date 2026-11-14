@@ -108,6 +108,38 @@ You can execute the **build_linux.sh** to build the binaries.
 ## Documentation
 For documentation, please refer to the Wiki section.
 
+## 课程实现
+
+本分支参考 [GAMES104 课程作业](https://games104.boomingtech.com/sc/course-work/)，实现了 LUT 调色、走跑跳动画、角色碰撞与跳跃参数编辑。修改原因、设计说明、代码阅读顺序和验证结果见 [LOG.md](LOG.md)。模块索引见 [ARCHITECTURE.md](ARCHITECTURE.md)。
+
+默认角色支持 WASD 移动、Shift 加速、空格跳跃。编辑器选中 Player 后，展开 MotorComponent → MotorComponentRes，可修改 `m_jump_initial_speed`；`m_use_jump_initial_speed` 控制使用初速度还是原来的跳跃高度。
+
+## 运行测试
+
+运行时回归测试使用 CTest，覆盖动画融合与状态切换、Jolt 碰撞和参数反射。测试直接链接生产运行时，无须创建窗口。macOS Debug 的命令如下：
+
+```sh
+cmake --preset macos-debug -DPICCOLO_BUILD_TESTS=ON
+cmake --build build/macos-debug --parallel 6 --target \
+  PiccoloEditor PiccoloAnimationTests PiccoloControllerTests PiccoloMotorTests PiccoloGameplaySmoke
+ctest --test-dir build/macos-debug --output-on-failure
+python3 -m unittest discover -s tests -p 'test_color_lut.py' -v
+```
+
+Release 使用 `macos-release` preset 和 `build/macos-release` 目录。其他平台可在原有 CMake 配置命令中加入 `-DPICCOLO_BUILD_TESTS=ON`。
+
+完整场景测试需要显示设备和 Vulkan，会打开窗口，模拟跳跃和移动，并通过反射修改下一次起跳速度。它使用临时运行状态，不保存关卡，单独执行：
+
+```sh
+build/macos-debug/tests/PiccoloGameplaySmoke "$PWD/bin/Debug/PiccoloEditor.ini"
+```
+
+调色 LUT 可用标准库脚本重新生成：
+
+```sh
+python3 scripts/generate_color_lut.py engine/asset/texture/lut/color_grading_warm.png
+```
+
 ## Extra
 
 ### Vulkan Validation Layer: Validation Error

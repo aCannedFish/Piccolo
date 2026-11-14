@@ -6,7 +6,7 @@
 
 | 任务 | 目标 | 状态 |
 | --- | --- | --- |
-| 构建基础 | 整理现有 macOS 适配，验证编辑器构建 | 已完成构建检查 |
+| 构建基础 | 整理现有 macOS 适配，验证编辑器构建 | 已完成 |
 | 调色 | 验证二维 LUT 插值，提供可复现的自定义 LUT | 已完成 |
 | 动画融合 | 多片段采样、逐骨骼权重和旋转插值 | 已完成 |
 | 动画切换 | 根据运动状态切换走、跑、跳动画 | 已完成 |
@@ -279,3 +279,56 @@ Debug 编辑器与三个 CTest 目标通过。Motor 测试增至 4 组，空控�
 Debug shader 和编辑器构建通过。使用构建目录中的临时 macOS app 包连接 UI 工具，重启编辑器后观察相同场景：天空、墙面和地面的彩色轮廓消失，颜色过渡连续。
 
 此次界面检查还确认 Player → MotorComponent → MotorComponentRes 中显示了 `m_use_jump_initial_speed` 复选框和数值为 4.500 的 `m_jump_initial_speed` 输入框。临时 app 包仅用于测试，位于忽略的 `build/` 目录。
+
+## 10 整体验证
+
+日期：2026-11-14。调色层级修复 `e82cbae` 已推送。
+
+### 代码改动
+
+- `tests/gameplay_smoke.cpp`：增加完整场景测试，启动真实引擎、加载默认世界，通过 InputSystem 触发跳跃与持续移动，经由反射修改起跳速度，并检查动画状态、落地、骨骼矩阵数量及位移。
+- `tests/CMakeLists.txt`：增加 `PiccoloGameplaySmoke` 目标。该测试需要显示设备和 Vulkan，因此独立运行。
+- `README.md`：补充功能入口、参数位置、Debug/Release 测试命令和 LUT 重建命令。
+- `ARCHITECTURE.md`：更新调色实现说明，补充状态机、碰撞反馈和测试目录索引。
+
+### 设计思路
+
+单元与模块测试负责检查具体公式和边界行为。完整场景测试把输入、Motor、Jolt、动画和 GPU 渲染串起来，用默认资源验证系统之间的数据传递。测试按 1/60 秒推进，共执行 432 帧，退出前调用正常关闭流程。
+
+默认关卡重力为 15 米每二次方秒，测试从关卡读取重力，并用 `v² / (2g)` 比较最高点。容差包含一个时间步的离散积分误差。初次测试曾误用固定跳高门槛，查明关卡重力后改为物理公式。
+
+### 验证结果
+
+| 检查 | 结果 |
+| --- | --- |
+| macOS Debug 编辑器构建 | 通过 |
+| macOS Release 编辑器构建 | 通过 |
+| Debug CTest | 3 个目标通过，含 9 组动画、6 组控制器、4 组 Motor 用例 |
+| Release CTest | 3 个目标通过，相同的 19 组用例保持有效 |
+| Python LUT 测试 | 4 项通过 |
+| Debug 完整场景 | 432 帧完成，正常退出 |
+| Release 完整场景 | 最终调色修复后重新运行 432 帧，正常退出 |
+| 起跳速度修改 | 4.5 m/s 时跳高 0.7125 m，6 m/s 时跳高约 1.25 m |
+| 动画状态 | 实际运行进入 idle、walk_start、walk_run、jump_start、jump_loop、jump_end |
+| Vulkan 检查 | 最终运行日志无 `Validation Error`、`[error]` 或断言 |
+| 编辑器界面 | 新字段显示正确，LUT 色带修复可见 |
+
+### 复现命令
+
+```sh
+cmake --preset macos-release -DPICCOLO_BUILD_TESTS=ON
+cmake --build build/macos-release --parallel 6 --target \
+  PiccoloEditor PiccoloAnimationTests PiccoloControllerTests PiccoloMotorTests PiccoloGameplaySmoke
+ctest --test-dir build/macos-release --output-on-failure
+python3 -m unittest discover -s tests -p 'test_color_lut.py' -v
+build/macos-release/tests/PiccoloGameplaySmoke "$PWD/bin/Release/PiccoloEditor.ini"
+```
+
+### 课程对照
+
+- [PA01](https://cdn.boomingtech.com/games104_static/upload/PA01%EF%BC%9ABuild%20and%20Run%20Pilot%20Engine.pdf)：完成本机构建、资源加载与运行验证。
+- [PA02](https://cdn.boomingtech.com/games104_static/upload/PA02%EF%BC%9ARendering.pdf)：完成 Color Grading 和自定义 LUT，修复实际画面中发现的 mipmap 串色。
+- [PA03](https://cdn.boomingtech.com/games104_static/upload/PA03%EF%BC%9AAnimation%20and%20Physics.pdf)：完成动画融合、走跑跳切换、墙面阻挡、贴墙下落、平台落地与沿墙滑动。
+- [PA04](https://cdn.boomingtech.com/games104_static/upload/PA04%EF%BC%9ATool%20Chains.pdf)：完成新参数反射、面板显示、序列化及运行时生效。
+
+各步骤均独立提交并推送。课程的额外后处理 Pass 等选做扩展未纳入本次实现；本次未执行课程平台提交。跨平台构建配置保留，本轮实际验证环境为 macOS。
