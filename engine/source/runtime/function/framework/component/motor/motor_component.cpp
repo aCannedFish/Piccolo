@@ -123,14 +123,11 @@ namespace Piccolo
             g_runtime_global_context.m_world_manager->getCurrentActivePhysicsScene().lock();
         ASSERT(physics_scene);
 
-        if (m_motor_res.m_jump_height == 0.f)
-            return;
-
         const float gravity = physics_scene->getGravity().length();
 
         if (m_jump_state == JumpState::idle)
         {
-            if ((unsigned int)GameCommand::jump & command)
+            if (m_motor_res.m_jump_height > 0.f && ((unsigned int)GameCommand::jump & command))
             {
                 m_jump_state                  = JumpState::rising;
                 m_vertical_move_speed         = Math::sqrt(m_motor_res.m_jump_height * 2 * gravity);
@@ -213,11 +210,27 @@ namespace Piccolo
                 break;
         }
 
-        // Piccolo-hack: motor level simulating jump, character always above z-plane
-        if (m_jump_state == JumpState::falling && final_position.z + m_desired_displacement.z <= 0.f)
+        // The physical controller reports support at the actual platform height.
+        if (m_controller_type == ControllerType::physics)
         {
+            if (m_controller->isGrounded())
+            {
+                m_jump_state = JumpState::idle;
+                m_vertical_move_speed = 0.f;
+            }
+            else if (m_jump_state == JumpState::idle || m_controller->hitCeiling())
+            {
+                m_jump_state = JumpState::falling;
+                m_vertical_move_speed = 0.f;
+                m_jump_horizontal_speed_ratio = m_move_speed_ratio;
+            }
+        }
+        else if (m_jump_state == JumpState::falling && final_position.z <= 0.f)
+        {
+            // Characters without a physics controller retain the original ground plane.
             final_position.z = 0.f;
-            m_jump_state     = JumpState::idle;
+            m_jump_state = JumpState::idle;
+            m_vertical_move_speed = 0.f;
         }
 
         m_is_moving       = (final_position - current_position).squaredLength() > 0.f;

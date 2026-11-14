@@ -26,6 +26,7 @@ namespace Piccolo
     struct PhysicsHitInfo
     {
         Vector3  hit_position;
+        // Normal points outward from the hit body, toward the query shape or ray.
         Vector3  hit_normal;
         float    hit_distance {0.f};
         uint32_t body_id {s_invalid_rigidbody_id};

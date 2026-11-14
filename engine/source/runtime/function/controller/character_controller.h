@@ -6,6 +6,7 @@
 
 namespace Piccolo
 {
+    class PhysicsScene;
     enum SweepPass
     {
         SWEEP_PASS_UP,
@@ -14,14 +15,18 @@ namespace Piccolo
         SWEEP_PASS_SENSOR
     };
 
+    // Reports collision-resolved movement and support contacts to the motor.
     class Controller
     {
     public:
         virtual ~Controller() = default;
 
         virtual Vector3 move(const Vector3& current_position, const Vector3& displacement) = 0;
+        virtual bool    isGrounded() const                                                 = 0;
+        virtual bool    hitCeiling() const                                                 = 0;
     };
 
+    // Sweeps a vertical capsule in separate vertical and horizontal passes.
     class CharacterController : public Controller
     {
     public:
@@ -30,8 +35,15 @@ namespace Piccolo
 
         Vector3 move(const Vector3& current_position, const Vector3& displacement) override;
 
+        // The explicit scene overload also supports simulation without a loaded world.
+        Vector3 move(PhysicsScene& scene, const Vector3& current_position, const Vector3& displacement);
+        bool    isGrounded() const override;
+        bool    hitCeiling() const override;
+
     private:
         Capsule        m_capsule;
         RigidBodyShape m_rigidbody_shape;
+        bool           m_is_grounded {false};
+        bool           m_hit_ceiling {false};
     };
 } // namespace Piccolo

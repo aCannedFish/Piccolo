@@ -238,6 +238,12 @@ namespace Piccolo
                              float                        sweep_length,
                              std::vector<PhysicsHitInfo>& out_hits)
     {
+        out_hits.clear();
+        if (sweep_length <= 0.f || sweep_direction.squaredLength() == 0.f)
+        {
+            return false;
+        }
+
         const JPH::NarrowPhaseQuery& scene_query = m_physics.m_jolt_physics_system->GetNarrowPhaseQuery();
 
         const Matrix4x4 shape_global_transform = shape_transform * shape.m_local_transform.getMatrix();
@@ -247,7 +253,8 @@ namespace Piccolo
 
         shape_global_transform.decomposition(global_position, global_scale, global_rotation);
 
-        JPH::Shape* jph_shape = toShape(shape, global_scale);
+        // Keep the temporary query shape alive for the cast and release it afterward.
+        JPH::Ref<JPH::Shape> jph_shape = toShape(shape, global_scale);
 
         if (jph_shape == nullptr)
         {
@@ -257,7 +264,7 @@ namespace Piccolo
         JPH::ShapeCast shape_cast =
             JPH::ShapeCast::sFromWorldTransform(jph_shape,
                                                 JPH::Vec3::sReplicate(1.f),
-                                                toMat44(shape_global_transform),
+                                                toMat44(Transform(global_position, global_rotation, Vector3::UNIT_SCALE).getMatrix()),
                                                 toVec3(sweep_direction.normalisedCopy() * sweep_length));
 
         JPH::AllHitCollisionCollector<JPH::CastShapeCollector> collector;
@@ -271,7 +278,6 @@ namespace Piccolo
 
         std::vector<JPH::ShapeCastResult> sweep_results(collector.mHits.begin(), collector.mHits.end());
 
-        out_hits.clear();
         out_hits.resize(sweep_results.size());
 
         for (size_t index = 0; index < sweep_results.size(); index++)
@@ -280,7 +286,8 @@ namespace Piccolo
 
             PhysicsHitInfo& hit = out_hits[index];
             hit.hit_position    = toVec3(sweep_result.mContactPointOn2);
-            hit.hit_normal      = toVec3(sweep_result.mPenetrationAxis.Normalized());
+            // Jolt points the penetration axis toward the hit body. Expose its outward normal.
+            hit.hit_normal      = -toVec3(sweep_result.mPenetrationAxis.Normalized());
             hit.hit_distance    = sweep_result.mFraction * sweep_length;
             hit.body_id         = sweep_result.mBodyID2.GetIndexAndSequenceNumber();
         }
