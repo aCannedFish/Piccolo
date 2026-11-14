@@ -2,6 +2,7 @@
 
 #include "runtime/function/animation/animation_system.h"
 #include "runtime/function/animation/skeleton.h"
+#include "runtime/function/framework/component/animation/animation_component.h"
 #include "runtime/function/global/global_context.h"
 #include "runtime/resource/asset_manager/asset_manager.h"
 #include "runtime/resource/config_manager/config_manager.h"
@@ -168,6 +169,107 @@ namespace
         result             = AnimationManager::getBlendStateWithClipData(blend);
         requireNear(result.blend_weight[0].blend_weight[1], 0.f, "Zero total weight does not divide by zero");
     }
+
+    void testStateTransitions()
+    {
+        AnimationFSM state;
+        require(!state.update(false, false, true), "Idle remains idle after its loop");
+        state.update(true, false, false);
+        require(std::string(state.getStateName()) == "walk_start", "Movement begins with walk start");
+        state.update(true, true, true);
+        require(std::string(state.getStateName()) == "jump_start", "Jump has priority over walk completion");
+        state.update(true, false, false);
+        require(std::string(state.getStateName()) == "jump_end", "Early landing interrupts jump start");
+        state.update(false, true, false);
+        require(std::string(state.getStateName()) == "jump_start", "A new jump interrupts landing");
+        state.update(false, true, true);
+        require(std::string(state.getStateName()) == "jump_loop", "Completed takeoff enters flight loop");
+        state.update(false, false, false);
+        state.update(true, false, true);
+        require(std::string(state.getStateName()) == "walk_run", "Moving landing resumes locomotion");
+        state.update(false, false, false);
+        require(std::string(state.getStateName()) == "walk_stop", "Stopping plays walk stop");
+        state.update(true, false, false);
+        require(std::string(state.getStateName()) == "walk_start", "Movement interrupts walk stop");
+        state.update(false, false, false);
+        state.update(false, false, true);
+        require(std::string(state.getStateName()) == "idle", "Completed stop returns to idle");
+    }
+
+    // Exposes protected resource data for assertions without changing runtime visibility.
+    class PlaybackFixture : public AnimationComponent
+    {
+    public:
+        void load(const AnimationComponentRes& resource)
+        {
+            m_animation_res = resource;
+            postLoadResource({});
+        }
+
+        const AnimationComponentRes& resource() const { return m_animation_res; }
+    };
+
+    AnimationComponentRes loadPlayerAnimation()
+    {
+        std::ifstream     input("asset/objects/character/player/player.object.json");
+        std::stringstream buffer;
+        buffer << input.rdbuf();
+        std::string error;
+        const Json  player = Json::parse(buffer.str(), error);
+        require(error.empty(), "Player JSON parses");
+        for (const Json& component : player["components"].array_items())
+        {
+            if (component["$typeName"].string_value() == "AnimationComponent")
+            {
+                AnimationComponentRes resource;
+                Serializer::read(component["$context"]["animation_res"], resource);
+                return resource;
+            }
+        }
+        throw std::runtime_error("Player has no animation component.");
+    }
+
+    void testLocomotionPlayback()
+    {
+        PlaybackFixture animation;
+        animation.load(loadPlayerAnimation());
+        animation.updateAnimation(0.1f, 0.f, false, false);
+        require(animation.getResult().node.size() == 58, "Idle produces all shipped skeleton matrices");
+        animation.updateAnimation(2.f, 1.f, true, false);
+        require(std::string(animation.getAnimationStateName()) == "walk_start", "One-shot holds its last frame");
+        animation.updateAnimation(0.f, 1.5f, true, false);
+        require(std::string(animation.getAnimationStateName()) == "walk_run", "Walk start completes");
+        animation.updateAnimation(0.1f, 1.5f, true, false);
+        for (const auto& state : animation.resource().locomotion_states)
+        {
+            if (state.name == "walk_run")
+            {
+                requireNear(state.blend_state.blend_weight[0], 0.5f, "Midpoint walk weight");
+                requireNear(state.blend_state.blend_weight[1], 0.5f, "Midpoint run weight");
+                requireNear(
+                    state.blend_state.blend_ratio[0], state.blend_state.blend_ratio[1], "Walk and run share phase");
+            }
+        }
+        animation.updateAnimation(0.7f, 1.5f, true, true);
+        animation.updateAnimation(0.f, 1.5f, true, true);
+        require(std::string(animation.getAnimationStateName()) == "jump_loop", "Takeoff finishes in the air");
+        animation.updateAnimation(4.f, 1.5f, true, true);
+        require(std::string(animation.getAnimationStateName()) == "jump_loop", "Flight animation loops");
+        animation.updateAnimation(1.f, 0.f, false, false);
+        require(std::string(animation.getAnimationStateName()) == "jump_end", "Landing plays the end clip");
+        animation.updateAnimation(0.f, 0.f, false, false);
+        require(std::string(animation.getAnimationStateName()) == "idle", "Landing completes into idle");
+    }
+
+    void testLegacyPlayback()
+    {
+        auto resource           = loadPlayerAnimation();
+        resource.use_locomotion = false;
+        PlaybackFixture animation;
+        animation.load(resource);
+        animation.updateAnimation(resource.blend_state.blend_clip_file_length[0] * 1.25f, 0.f, false, false);
+        requireNear(animation.resource().blend_state.blend_ratio[0], 0.25f, "Legacy clip loops independently");
+    }
 } // namespace
 
 int main()
@@ -180,7 +282,10 @@ int main()
         testZeroWeightAndInvalidMapping();
         testSkeletonRebuild();
         testResourceWeights();
-        std::cout << "Passed 6 animation regression cases.\n";
+        testStateTransitions();
+        testLocomotionPlayback();
+        testLegacyPlayback();
+        std::cout << "Passed 9 animation regression cases.\n";
         return 0;
     }
     catch (const std::exception& error)

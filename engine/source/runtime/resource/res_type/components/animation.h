@@ -28,6 +28,18 @@ namespace Piccolo
         std::vector<AnimationResultElement> node;
     };
 
+    // Associates a named state with clips and optional ordered speed-ratio samples.
+    REFLECTION_TYPE(AnimationStateRes)
+    CLASS(AnimationStateRes, Fields)
+    {
+        REFLECTION_BODY(AnimationStateRes);
+
+    public:
+        std::string name;
+        BlendState blend_state;
+        std::vector<float> speed_ratios;
+    };
+
     REFLECTION_TYPE(AnimationComponentRes)
     CLASS(AnimationComponentRes, Fields)
     {
@@ -36,6 +48,8 @@ namespace Piccolo
     public:
         std::string skeleton_file_path;
         BlendState  blend_state;
+        bool use_locomotion {false};
+        std::vector<AnimationStateRes> locomotion_states;
         // animation to skeleton map
         float       frame_position; // 0-1
 

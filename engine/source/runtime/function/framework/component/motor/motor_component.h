@@ -38,6 +38,10 @@ namespace Piccolo
 
         float getSpeedRatio() const { return m_move_speed_ratio; }
         bool  getIsMoving() const { return m_is_moving; }
+        bool isJumping() const
+        {
+            return m_jump_state != JumpState::idle;
+        }
 
         META(Enable)
         void getOffStuckDead();
