@@ -25,9 +25,10 @@ To build Piccolo, you must first install the following tools.
 - CMake 3.19 (or more recent)
 - Git 2.1 (or more recent)
 
-### macOS >= 10.15 (x86_64)
-- Xcode 12.3 (or more recent)
-- CMake 3.19 (or more recent)
+### macOS
+- Xcode with the macOS SDK and command line tools
+- CMake 3.21 (or more recent)
+- Ninja
 - Git 2.1 (or more recent)
 
 ### Ubuntu 20.04
@@ -53,7 +54,7 @@ sudo apt install mesa-vulkan-drivers
 ## Build Piccolo
 
 ### Build on Windows
-You may execute the **build_windows.bat**. This batch file will generate the projects, and build the **Release** config of **Piccolo Engine** automatically. After successful build, you can find the PiccoloEditor.exe at the **bin** directory.
+You may execute the **build_windows.bat**. This batch file will generate the projects, and build the **Release** config of **Piccolo Engine** automatically. After successful build, you can find PiccoloEditor.exe in `bin/Release`.
 
 Or you can use the following command to generate the **Visual Studio** project firstly, then open the solution in the build directory and build it manually.
 ```
@@ -62,20 +63,44 @@ cmake -S . -B build
 
 ### Build on macOS
 
-> The following build instructions only tested on specific hardware of x86_64, and do not support M1 chips. For M1 compatible, we will release later.
+The macOS presets use Ninja and the active Xcode toolchain. The build supports Apple Silicon and uses the bundled Vulkan libraries.
 
-To compile Piccolo, you must have the most recent version of Xcode installed.
-Then run 'cmake' from the project's root directory, to generate a project of Xcode.
+Run either command from the repository directory:
 
-```
-cmake -S . -B build -G "Xcode"
-```
-and you can build the project with
-```
-cmake --build build --config Release
+```sh
+./build_macos.sh debug
+./build_macos.sh release
 ```
 
-Or you can execute the **build_macos.sh** to build the binaries.
+The configurations use `build/macos-debug` and `build/macos-release`. Each build copies its executable, resources, and assets to `bin/Debug` or `bin/Release`.
+
+```sh
+./bin/Debug/PiccoloEditor
+./bin/Release/PiccoloEditor
+```
+
+The scripts also copy the selected configuration's compilation database to `compile_commands.json` in the repository directory.
+
+You can configure and build directly with CMake:
+
+```sh
+cmake --preset macos-debug
+cmake --build --preset macos-debug --parallel
+```
+
+Use `macos-release` for Release. Direct CMake commands generate the compilation database inside the build directory.
+
+### VS Code
+
+Open the repository directory in VS Code and install the extensions recommended by `.vscode/extensions.json`.
+
+1. Run `CMake: Select Configure Preset` and select `macos-debug` or `macos-release`. CMake Tools copies its compilation database to the repository directory after configuration.
+2. Run the default build task with `Cmd+Shift+B`. Use `Tasks: Run Build Task` to select the Release task.
+3. Select `PiccoloEditor Debug` or `PiccoloEditor Release` in Run and Debug, then press F5. The launch configuration builds the selected version first.
+
+The first build generates the reflection and shader headers required for code analysis. clangd reads the compiler flags, include directories, and definitions from `compile_commands.json`. The workspace disables Microsoft C/C++ IntelliSense to keep clangd as the language server.
+
+GLSL IntelliSense searches `engine/shader/include` and uses the bundled macOS `glslangValidator` with Vulkan 1.0 rules, matching the shader build. The workspace associates shader headers and `.inl` files with GLSL. Run `GLSL: Restart Language Server` from the Command Palette to refresh an existing session.
 
 ### Build on Ubuntu 20.04
 You can execute the **build_linux.sh** to build the binaries.

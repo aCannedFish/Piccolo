@@ -2182,16 +2182,12 @@ namespace sol {
 			return *this;
 		}
 
-		/// Constructs the value in-place, destroying the current one if there is
-		/// one.
-		///
+		/// Rebinds this optional to arg.
 		/// \group emplace
-		template <class... Args>
-		T& emplace(Args&&... args) noexcept {
-			static_assert(std::is_constructible<T, Args&&...>::value, "T must be constructible with Args");
-
+		T& emplace(T& arg) noexcept {
 			*this = nullopt;
-			this->construct(std::forward<Args>(args)...);
+			m_value = std::addressof(arg);
+			return **this;
 		}
 
 		/// Swaps this optional with the other.

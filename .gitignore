@@ -11,7 +11,12 @@ CPM_*.cmake
 CMakeSettings.json
 
 # Visual Studio Code
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+CMakeUserPresets.json
 *.code-workspace
 
 # CLion

@@ -1,0 +1,27 @@
+{
+    "cmake.useCMakePresets": "always",
+    "cmake.configureOnOpen": true,
+    "cmake.copyCompileCommands": "${workspaceFolder}/compile_commands.json",
+    "clangd.path": "/usr/bin/clangd",
+    "clangd.arguments": [
+        "--background-index",
+        "--clang-tidy=false",
+        "--compile-commands-dir=${workspaceFolder}",
+        "--query-driver=/usr/bin/clang*"
+    ],
+    "C_Cpp.intelliSenseEngine": "disabled",
+    "glslLsp.includePaths": [
+        "engine/shader/include"
+    ],
+    "glslLsp.diagnostics.glslang.path": "engine/3rdparty/VulkanSDK/bin/MacOS/glslangValidator",
+    "glslLsp.diagnostics.glslang.targetEnv": "vulkan1.0",
+    "files.associations": {
+        "*.inl": "cpp",
+        "**/engine/shader/include/*.h": "glsl",
+        "**/engine/shader/include/*.inl": "glsl"
+    },
+    "files.watcherExclude": {
+        "**/build/**": true,
+        "**/bin/**": true
+    }
+}

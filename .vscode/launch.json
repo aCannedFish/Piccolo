@@ -1,0 +1,23 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "PiccoloEditor Debug",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/macos-debug/engine/source/editor/PiccoloEditor",
+            "cwd": "${workspaceFolder}/bin/Debug",
+            "args": [],
+            "preLaunchTask": "Piccolo: Build Debug"
+        },
+        {
+            "name": "PiccoloEditor Release",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/macos-release/engine/source/editor/PiccoloEditor",
+            "cwd": "${workspaceFolder}/bin/Release",
+            "args": [],
+            "preLaunchTask": "Piccolo: Build Release"
+        }
+    ]
+}

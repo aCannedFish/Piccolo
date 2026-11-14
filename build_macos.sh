@@ -1,31 +1,25 @@
 #!/bin/bash
+set -euo pipefail
 
-if test \( $# -ne 1 \);
-then
-    echo "Usage: ./build_macos.sh config"
-    echo ""
-    echo "config:"
-    echo "  debug   -   build with the debug configuration"
-    echo "  release -   build with the release configuration"
-    echo ""
+# Configure and build from the repository directory.
+if [[ $# -ne 1 ]]; then
+    echo "Usage: $0 {debug|release}" >&2
     exit 1
 fi
 
+case "$1" in
+    debug|release)
+        preset="macos-$1"
+        ;;
+    *)
+        echo "Unsupported configuration: $1. Use debug or release." >&2
+        exit 1
+        ;;
+esac
 
-if test \( \( -n "$1" \) -a \( "$1" = "debug" \) \);then
-    CONFIG=" Debug"
-elif test \( \( -n "$1" \) -a \( "$1" = "release" \) \);then
-    CONFIG=" Release"
-else
-    echo "The config \"$1\" is not supported!"
-    echo ""
-    echo "Configs:"
-    echo "  debug   -   build with the debug configuration"
-    echo "  release -   build with the release configuration"
-    echo ""
-    exit 1
-fi
+project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$project_dir"
 
-cmake -S . -B build -G "Xcode"
-
-cmake --build build --config "${CONFIG}"
+cmake --preset "$preset"
+cp "build/$preset/compile_commands.json" compile_commands.json
+cmake --build --preset "$preset" --parallel "$(sysctl -n hw.logicalcpu)"

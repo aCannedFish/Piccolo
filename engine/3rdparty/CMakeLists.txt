@@ -1,5 +1,8 @@
 set(third_party_folder "ThirdParty")
 
+# Keep the bundled dependencies compatible with CMake 4.
+set(CMAKE_POLICY_VERSION_MINIMUM 3.10)
+
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
 if(NOT TARGET imgui)
@@ -55,6 +58,12 @@ if(NOT TARGET Jolt)
         check_cxx_compiler_flag("-Wno-unqualified-std-cast-call" COMPILER_CHECK_UNQUALIFIED)
         if(COMPILER_CHECK_UNQUALIFIED)
             target_compile_options(Jolt PRIVATE "-Wno-unqualified-std-cast-call")
+        endif()
+
+        # Recent Clang versions warn about Jolt's existing raw memory copies.
+        check_cxx_compiler_flag("-Wno-error=nontrivial-memcall" COMPILER_CHECK_NONTRIVIAL_MEMCALL)
+        if(COMPILER_CHECK_NONTRIVIAL_MEMCALL)
+            target_compile_options(Jolt PRIVATE "-Wno-error=nontrivial-memcall")
         endif()
     endif()
 

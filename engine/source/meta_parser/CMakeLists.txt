@@ -12,8 +12,6 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${HEADERS} ${SOURCES})
 
 
 set(LLVM_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/3rd_party/LLVM/include ${CMAKE_CURRENT_SOURCE_DIR}/3rd_party/mustache ${CMAKE_CURRENT_SOURCE_DIR})
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${ENGINE_ROOT_DIR}/bin)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${ENGINE_ROOT_DIR}/bin)
 # add LLVM includes
 include_directories(${LLVM_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/parser)
 
@@ -25,6 +23,7 @@ add_executable(${TARGET_NAME} ${HEADERS} ${SOURCES})
 
 set_target_properties(${TARGET_NAME} PROPERTIES CXX_STANDARD 17)
 set_target_properties(${TARGET_NAME} PROPERTIES FOLDER "Tools")
+set_target_properties(${TARGET_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/engine/bin")
 
 if (CMAKE_HOST_WIN32)
     set(LLVM_LIBRARY_DIR  ${CMAKE_CURRENT_SOURCE_DIR}/3rd_party/LLVM/lib/x64)
@@ -36,12 +35,22 @@ elseif(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Linux")
     set(LLVM_SHARED_LIBRARY_DIR  ${CMAKE_CURRENT_SOURCE_DIR}/3rd_party/LLVM/bin/Linux)
     set(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O3")
     target_link_libraries(${TARGET_NAME}  ${LLVM_SHARED_LIBRARY_DIR}/libclang.so.12)
-elseif(${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "arm64") 
-    # link to XCode Toolchains' universal binary libclang.dylib 
-    set(LLVM_LIBRARY_DIR  ${CMAKE_CURRENT_SOURCE_DIR}/3rd_party/LLVM/lib/macOS)
-    set(LLVM_SHARED_LIBRARY_DIR  ${OSX_DEVELOPER_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/lib)
-    set(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O3")
-    target_link_libraries(${TARGET_NAME}  ${LLVM_SHARED_LIBRARY_DIR}/libclang.dylib)    
+elseif(CMAKE_HOST_APPLE)
+    # Use libclang from the active Xcode toolchain on both Apple architectures.
+    find_program(XCRUN_EXECUTABLE xcrun REQUIRED)
+    execute_process(
+        COMMAND "${XCRUN_EXECUTABLE}" --find clang
+        OUTPUT_VARIABLE XCODE_CLANG_EXECUTABLE
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        COMMAND_ERROR_IS_FATAL ANY
+    )
+    get_filename_component(XCODE_TOOLCHAIN_BIN "${XCODE_CLANG_EXECUTABLE}" DIRECTORY)
+    get_filename_component(XCODE_TOOLCHAIN_USR "${XCODE_TOOLCHAIN_BIN}" DIRECTORY)
+    find_library(PICCOLO_LIBCLANG clang
+        PATHS "${XCODE_TOOLCHAIN_USR}/lib"
+        NO_DEFAULT_PATH REQUIRED
+    )
+    target_link_libraries(${TARGET_NAME} "${PICCOLO_LIBCLANG}")
 else()
     set(LLVM_LIBRARY_DIR  ${CMAKE_CURRENT_SOURCE_DIR}/3rd_party/LLVM/lib/macOS)
     set(LLVM_SHARED_LIBRARY_DIR  ${CMAKE_CURRENT_SOURCE_DIR}/3rd_party/LLVM/bin/macOS)
@@ -56,10 +65,12 @@ endif()
 add_definitions(-DTIXML_USE_STL)
 
 # copy resources on post build
-add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+if(NOT CMAKE_HOST_APPLE)
+  add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
 	# mustache templates directory
 	COMMAND ${CMAKE_COMMAND} -E copy_directory
 		"${LLVM_SHARED_LIBRARY_DIR}"
 		$<TARGET_FILE_DIR:${TARGET_NAME}>
 )
+endif()
 

@@ -127,7 +127,8 @@ bool MetaParser::parseProject()
 
     for (auto include_item : inlcude_files)
     {
-        std::string temp_string(include_item);
+        // Remove whitespace from the generated header list before writing includes.
+        std::string temp_string = Utils::trim(include_item, " \t\r\n");
         Utils::replace(temp_string, '\\', '/');
         include_file << "#include  \"" << temp_string << "\"" << std::endl;
     }
