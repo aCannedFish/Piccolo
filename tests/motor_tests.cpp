@@ -40,7 +40,7 @@ namespace
     {
         MotorComponentRes resource;
         resource.m_controller_config = PICCOLO_REFLECTION_NEW(PhysicsControllerConfig);
-        auto              metadata = Reflection::TypeMeta::newMetaFromName("MotorComponentRes");
+        auto metadata                = Reflection::TypeMeta::newMetaFromName("MotorComponentRes");
         require(metadata.isValid(), "Motor resource metadata exists");
         auto speed_field = metadata.getFieldByName("m_jump_initial_speed");
         auto mode_field  = metadata.getFieldByName("m_use_jump_initial_speed");
@@ -73,6 +73,22 @@ namespace
                     std::sqrt(29.4f),
                     "Old jump height is preserved");
     }
+    void testEmptyControllerRoundTrip()
+    {
+        MotorComponentRes resource;
+        resource.m_jump_height = 1.f;
+        const Json saved       = Serializer::write(resource);
+        require(saved["controller_config"].is_null(), "An empty controller saves as JSON null");
+        MotorComponentRes restored;
+        Serializer::read(saved, restored);
+        require(restored.m_controller_config == nullptr, "An empty controller remains empty after loading");
+        requireNear(restored.m_jump_height, 1.f, "Other motor settings survive the round trip");
+
+        float*     pointer       = nullptr;
+        const Json empty_pointer = Serializer::writePointer(pointer);
+        Serializer::readPointer(empty_pointer, pointer);
+        require(pointer == nullptr, "Raw optional pointers also preserve JSON null");
+    }
 } // namespace
 
 int main()
@@ -83,7 +99,8 @@ int main()
         testJumpModes();
         testReflectionAndSerialization();
         testLegacyResource();
-        std::cout << "Passed 3 motor regression cases.\n";
+        testEmptyControllerRoundTrip();
+        std::cout << "Passed 4 motor regression cases.\n";
         return 0;
     }
     catch (const std::exception& error)

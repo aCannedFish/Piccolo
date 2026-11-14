@@ -9,12 +9,17 @@ namespace Piccolo
     template<typename...>
     inline constexpr bool always_false = false;
 
+    // Converts reflected resources to JSON. Optional pointers use JSON null when empty.
     class Serializer
     {
     public:
         template<typename T>
         static Json writePointer(T* instance)
         {
+            if (instance == nullptr)
+            {
+                return Json();
+            }
             return Json::object {{"$typeName", Json {"*"}}, {"$context", Serializer::write(*instance)}};
         }
 
@@ -22,6 +27,10 @@ namespace Piccolo
         static T*& readPointer(const Json& json_context, T*& instance)
         {
             assert(instance == nullptr);
+            if (json_context.is_null())
+            {
+                return instance;
+            }
             std::string type_name = json_context["$typeName"].string_value();
             assert(!type_name.empty());
             if ('*' == type_name[0])
@@ -41,6 +50,10 @@ namespace Piccolo
         static Json write(const Reflection::ReflectionPtr<T>& instance)
         {
             T*          instance_ptr = static_cast<T*>(instance.operator->());
+            if (instance_ptr == nullptr)
+            {
+                return Json();
+            }
             std::string type_name    = instance.getTypeName();
             return Json::object {{"$typeName", Json(type_name)},
                                   {"$context", Reflection::TypeMeta::writeByName(type_name, instance_ptr)}};

@@ -236,3 +236,23 @@ Debug 编辑器及测试构建通过。动画测试增加到 9 组，控制器 6
 Debug 编辑器、动画、控制器和 Motor 测试构建通过，CTest 三个目标全部通过。新增 3 组 Motor 用例覆盖高度公式、速度直接设置、负值、反射修改后计算结果、JSON 保存与重载、旧资源保持高度模式。
 
 反射用例使用与默认玩家相同的 PhysicsControllerConfig，检查完整组件资源的序列化。面板控件类型已经通过生成元数据和现有 UI 注册代码核对，交互画面仍待人工查看。
+
+## 08 空指针
+
+日期：2026-11-14。跳跃参数提交 `b479ac7` 已推送。
+
+### 问题原因
+
+参数保存测试发现，没有 ControllerConfig 的 Motor 资源会将空指针写成空类型名的对象，读取时触发类型名断言。无控制器本来就是 Motor 支持的模式，需要保存这种资源配置。
+
+### 代码改动
+
+`Serializer::writePointer()` 和反射指针的 `write()` 将空指针写为 JSON null；`readPointer()` 在读取 null 时保留空指针。非空指针继续使用原有的类型名称与内容表示。
+
+### 阅读顺序
+
+先看 `core/meta/serializer/serializer.h` 的指针读写入口，再看生成的 MotorComponentRes 序列化代码如何调用这些入口。`testEmptyControllerRoundTrip()` 用无控制器资源完成保存与读取，同时检查普通可选指针。
+
+### 验证结果
+
+Debug 编辑器与三个 CTest 目标通过。Motor 测试增至 4 组，空控制器保存为 null，重载后保留跳跃参数且不触发断言。
