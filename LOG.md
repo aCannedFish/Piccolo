@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | 构建基础 | 整理现有 macOS 适配，验证编辑器构建 | 已完成构建检查 |
 | 调色 | 验证二维 LUT 插值，提供可复现的自定义 LUT | 已完成 |
-| 动画融合 | 多片段采样、逐骨骼权重和旋转插值 | 待实现 |
+| 动画融合 | 多片段采样、逐骨骼权重和旋转插值 | 已完成 |
 | 动画切换 | 根据运动状态切换走、跑、跳动画 | 待实现 |
 | 角色碰撞 | 形状扫描、平台落地、墙面滑动 | 待实现 |
 | 参数编辑 | 通过反射编辑跳跃参数并在运行时生效 | 待实现 |
@@ -107,3 +107,41 @@ cmake --build --preset macos-debug --parallel 6
 Debug 构建通过。重新启动编辑器并等待默认世界加载完成，再运行两秒；进程保持运行，日志中没有 `Validation Error` 或 `[error]`。本次启动加载了新的暖色 LUT。检查完成后终止测试进程。
 
 同时更正上一节最初遗漏的 validation error 记录。
+
+## 04 动画融合
+
+日期：2026-11-14。设备扩展修复 `fd86a13` 已推送。
+
+### 问题原因
+
+当前 `Skeleton::applyAnimation()` 固定遍历第一个片段，权重也固定为 1。短轨道会修改后续通道使用的帧索引，空轨道可能越界。资源管理器把 skeleton 路径传给了动画映射加载器，并在总权重为零时继续做除法。这些问题会影响 PA03 要求的融合效果。
+
+### 代码改动
+
+- `skeleton.cpp/.h`：遍历全部有效片段，独立采样每个轨道，累加逐骨骼平移、缩放和旋转；应用局部变换后按父子顺序更新骨骼。重建失败时清空旧骨骼指针和数量。
+- `animation_system.cpp/.h`：使用正确的 skeleton 缓存，检查片段数组和骨骼遮罩，屏蔽禁用骨骼后归一化权重。总权重为零时保留零权重。
+- `animation_component.cpp/.h`：按各自的时长推进所有片段。
+- `skeleton_data.h`、`blend_state.h`：为根骨骼父索引和片段数量设置确定的默认值。
+- 根 `CMakeLists.txt`、`tests/`：新增可选 CTest 目标，直接链接生产运行时，测试无须窗口或 GPU。
+
+### 设计思路
+
+现有动画资源存储相对 bind pose 的局部偏移，保留这一约定。先混合偏移，再对 bind pose 应用一次。平移和缩放按总权重归一化；旋转先统一四元数符号，再加权求和并归一化。等价的 `q` 和 `-q` 因此不会互相抵消。
+
+轨道时间由片段的总帧数计算，每条轨道独立处理末帧。空平移、旋转、缩放轨道分别使用零位移、单位旋转、单位缩放。没有有效贡献的骨骼保持 bind pose。
+
+随附资源包含 58 根骨骼和 213 项遮罩。遮罩检查要求覆盖所有骨骼，允许资源保留多余项。这个兼容规则来自实际资源测试。
+
+### 阅读顺序
+
+从 `AnimationComponent::tick()` 看时间推进，再看 `AnimationManager::getBlendStateWithClipData()` 的资源与权重处理，最后看 `Skeleton::applyAnimation()` 的采样、累加和层级更新。`tests/animation_tests.cpp` 中的两根骨骼夹具便于手算结果。
+
+### 验证结果
+
+```sh
+cmake --preset macos-debug -DPICCOLO_BUILD_TESTS=ON
+cmake --build build/macos-debug --target PiccoloAnimationTests PiccoloEditor --parallel 6
+ctest --test-dir build/macos-debug --output-on-failure
+```
+
+Debug 构建通过，CTest 的动画目标通过 6 组回归用例：加权位置与父子传播、旋转及缩放、空轨道和不同轨道长度、零权重与无效映射、骨骼重建、真实资源权重归一化。测试使用显式异常检查，在 Release 下也会执行。

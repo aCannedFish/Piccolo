@@ -22,7 +22,7 @@ namespace Piccolo
         REFLECTION_BODY(BlendStateWithClipData);
 
     public:
-        int                          clip_count;
+        int                          clip_count {0};
         std::vector<AnimationClip>   blend_clip;
         std::vector<AnimSkelMap>     blend_anim_skel_map;
         std::vector<BoneBlendWeight> blend_weight;
@@ -35,7 +35,7 @@ namespace Piccolo
         REFLECTION_BODY(BlendState);
 
     public:
-        int                      clip_count;
+        int                      clip_count {0};
         std::vector<std::string> blend_clip_file_path;
         std::vector<float>       blend_clip_file_length;
         std::vector<std::string> blend_anim_skel_map_path;

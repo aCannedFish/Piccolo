@@ -5,6 +5,9 @@
 #include "runtime/function/animation/animation_loader.h"
 #include "runtime/function/animation/skeleton.h"
 
+#include <algorithm>
+#include <stdexcept>
+
 namespace Piccolo
 {
     std::map<std::string, std::shared_ptr<SkeletonData>>  AnimationManager::m_skeleton_definition_cache;
@@ -83,70 +86,67 @@ namespace Piccolo
     BlendStateWithClipData AnimationManager::getBlendStateWithClipData(const BlendState& blend_state)
     {
 
-        for (auto animation_file_path : blend_state.blend_clip_file_path)
+        BlendStateWithClipData result;
+        if (blend_state.clip_count <= 0)
         {
-            tryLoadAnimation(animation_file_path);
+            return result;
         }
-        for (auto anim_skel_map_path : blend_state.blend_anim_skel_map_path)
+        const size_t clip_count = static_cast<size_t>(blend_state.clip_count);
+        if (blend_state.blend_clip_file_path.size() < clip_count ||
+            blend_state.blend_anim_skel_map_path.size() < clip_count ||
+            blend_state.blend_mask_file_path.size() < clip_count ||
+            blend_state.blend_weight.size() < clip_count ||
+            blend_state.blend_ratio.size() < clip_count)
         {
-            tryLoadAnimationSkeletonMap(anim_skel_map_path);
-        }
-        for (auto skeleton_mask_path : blend_state.blend_mask_file_path)
-        {
-            tryLoadSkeletonMask(skeleton_mask_path);
+            throw std::invalid_argument("Animation blend arrays must contain clip_count entries.");
         }
 
-        BlendStateWithClipData blend_state_with_clip_data;
-        blend_state_with_clip_data.clip_count  = blend_state.clip_count;
-        blend_state_with_clip_data.blend_ratio = blend_state.blend_ratio;
-        for (const auto& iter : blend_state.blend_clip_file_path)
+        result.clip_count = blend_state.clip_count;
+        std::vector<std::shared_ptr<BoneBlendMask>> masks;
+        for (size_t clip_index = 0; clip_index < clip_count; ++clip_index)
         {
-            blend_state_with_clip_data.blend_clip.push_back(*m_animation_data_cache[iter]);
+            result.blend_clip.push_back(*tryLoadAnimation(blend_state.blend_clip_file_path[clip_index]));
+            result.blend_anim_skel_map.push_back(
+                *tryLoadAnimationSkeletonMap(blend_state.blend_anim_skel_map_path[clip_index]));
+            result.blend_ratio.push_back(blend_state.blend_ratio[clip_index]);
+            masks.push_back(tryLoadSkeletonMask(blend_state.blend_mask_file_path[clip_index]));
         }
-        for (const auto& iter : blend_state.blend_anim_skel_map_path)
-        {
-            blend_state_with_clip_data.blend_anim_skel_map.push_back(*m_animation_skeleton_map_cache[iter]);
-        }
-        std::vector<std::shared_ptr<BoneBlendMask>> blend_masks;
-        for (auto& iter : blend_state.blend_mask_file_path)
-        {
-            blend_masks.push_back(m_skeleton_mask_cache[iter]);
-            tryLoadAnimationSkeletonMap(m_skeleton_mask_cache[iter]->skeleton_file_path);
-        }
-        size_t skeleton_bone_count = m_skeleton_definition_cache[blend_masks[0]->skeleton_file_path]->bones_map.size();
-        blend_state_with_clip_data.blend_weight.resize(blend_state.clip_count);
-        for (size_t clip_index = 0; clip_index < blend_state.clip_count; clip_index++)
-        {
-            blend_state_with_clip_data.blend_weight[clip_index].blend_weight.resize(skeleton_bone_count);
-        }
-        for (size_t bone_index = 0; bone_index < skeleton_bone_count; bone_index++)
-        {
-            float sum_weight = 0;
-            for (size_t clip_index = 0; clip_index < blend_state.clip_count; clip_index++)
-            {
-                if (blend_masks[clip_index]->enabled[bone_index])
-                {
-                    sum_weight += blend_state.blend_weight[clip_index];
-                }
-            }
-            if (fabs(sum_weight) < 0.0001f)
-            {
-                // LOG_ERROR
-            }
-            for (size_t clip_index = 0; clip_index < blend_state.clip_count; clip_index++)
-            {
-                if (blend_masks[clip_index]->enabled[bone_index])
-                {
 
-                    blend_state_with_clip_data.blend_weight[clip_index].blend_weight[bone_index] =
-                        blend_state.blend_weight[clip_index] / sum_weight;
-                }
-                else
+        // Masks refer to skeleton assets. Load that resource through the skeleton cache.
+        const auto skeleton = tryLoadSkeleton(masks.front()->skeleton_file_path);
+        const size_t bone_count = skeleton->bones_map.size();
+        result.blend_weight.resize(clip_count);
+        for (size_t clip_index = 0; clip_index < clip_count; ++clip_index)
+        {
+            if (masks[clip_index]->skeleton_file_path != masks.front()->skeleton_file_path ||
+                masks[clip_index]->enabled.size() < bone_count)
+            {
+                throw std::invalid_argument("Animation masks must reference the same skeleton and cover all bones.");
+            }
+            result.blend_weight[clip_index].blend_weight.resize(bone_count, 0.f);
+        }
+
+        // Normalize per bone after applying masks. Zero total weight preserves the bind pose.
+        for (size_t bone_index = 0; bone_index < bone_count; ++bone_index)
+        {
+            float total_weight = 0.f;
+            for (size_t clip_index = 0; clip_index < clip_count; ++clip_index)
+            {
+                if (masks[clip_index]->enabled[bone_index])
                 {
-                    blend_state_with_clip_data.blend_weight[clip_index].blend_weight[bone_index] = 0;
+                    const float weight = std::max(blend_state.blend_weight[clip_index], 0.f);
+                    result.blend_weight[clip_index].blend_weight[bone_index] = weight;
+                    total_weight += weight;
+                }
+            }
+            if (total_weight > 0.f)
+            {
+                for (size_t clip_index = 0; clip_index < clip_count; ++clip_index)
+                {
+                    result.blend_weight[clip_index].blend_weight[bone_index] /= total_weight;
                 }
             }
         }
-        return blend_state_with_clip_data;
+        return result;
     }
 } // namespace Piccolo

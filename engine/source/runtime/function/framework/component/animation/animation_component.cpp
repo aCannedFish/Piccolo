@@ -16,9 +16,18 @@ namespace Piccolo
 
     void AnimationComponent::tick(float delta_time)
     {
-        m_animation_res.blend_state.blend_ratio[0] +=
-            (delta_time / m_animation_res.blend_state.blend_clip_file_length[0]);
-        m_animation_res.blend_state.blend_ratio[0] -= floor(m_animation_res.blend_state.blend_ratio[0]);
+        // Every active clip advances at its own duration before pose sampling.
+        BlendState& blend_state = m_animation_res.blend_state;
+        for (int clip_index = 0; clip_index < blend_state.clip_count; ++clip_index)
+        {
+            float& phase = blend_state.blend_ratio.at(clip_index);
+            const float duration = blend_state.blend_clip_file_length.at(clip_index);
+            if (duration > 0.f)
+            {
+                phase += delta_time / duration;
+                phase -= std::floor(phase);
+            }
+        }
 
         m_skeleton.applyAnimation(AnimationManager::getBlendStateWithClipData(m_animation_res.blend_state));
         m_animation_res.animation_result = m_skeleton.outputAnimationResult();

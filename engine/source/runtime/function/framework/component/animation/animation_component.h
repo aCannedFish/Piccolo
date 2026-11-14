@@ -6,6 +6,7 @@
 
 namespace Piccolo
 {
+    // Advances clip playback and publishes the skeleton matrices used by rendering.
     REFLECTION_TYPE(AnimationComponent)
     CLASS(AnimationComponent : public Component, WhiteListFields)
     {

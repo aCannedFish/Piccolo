@@ -12,6 +12,7 @@
 
 namespace Piccolo
 {
+    // Caches animation resources and resolves masked weights for each skeleton bone.
     class AnimationManager
     {
     private:

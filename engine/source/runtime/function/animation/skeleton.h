@@ -9,6 +9,7 @@ namespace Piccolo
     class SkeletonData;
     class BlendStateWithClipData;
 
+    // Owns the bind-pose hierarchy and applies weighted local animation offsets.
     class Skeleton
     {
     private:

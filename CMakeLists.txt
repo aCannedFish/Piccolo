@@ -23,3 +23,10 @@ set(BINARY_ROOT_DIR "${CMAKE_INSTALL_PREFIX}/$<CONFIG>")
 
 
 add_subdirectory(engine)
+
+# Runtime regression tests run without a window or a Vulkan device.
+option(PICCOLO_BUILD_TESTS "Build Piccolo runtime regression tests" OFF)
+if(PICCOLO_BUILD_TESTS)
+  enable_testing()
+  add_subdirectory(tests)
+endif()

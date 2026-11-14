@@ -14,10 +14,10 @@ namespace Piccolo
 
     public:
         std::string name;
-        int         index;
+        int         index {0};
         Transform   binding_pose;
         Matrix4x4_  tpose_matrix;
-        int         parent_index;
+        int         parent_index {-1};
     };
 
     REFLECTION_TYPE(SkeletonData)
