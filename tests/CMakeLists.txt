@@ -19,3 +19,9 @@ add_test(NAME PiccoloVignetteTests COMMAND PiccoloVignetteTests)
 # This executable needs a display and Vulkan. Run it explicitly with an editor INI path.
 add_executable(PiccoloGameplaySmoke gameplay_smoke.cpp)
 target_link_libraries(PiccoloGameplaySmoke PRIVATE PiccoloRuntime)
+
+add_executable(PiccoloVignetteGpuTests vignette_gpu_tests.cpp)
+target_link_libraries(PiccoloVignetteGpuTests PRIVATE PiccoloRuntime)
+
+add_executable(PiccoloPostProcessSmoke post_process_smoke.cpp)
+target_link_libraries(PiccoloPostProcessSmoke PRIVATE PiccoloRuntime)

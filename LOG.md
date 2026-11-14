@@ -12,6 +12,7 @@
 | 动画切换 | 根据运动状态切换走、跑、跳动画 | 已完成 |
 | 角色碰撞 | 形状扫描、平台落地、墙面滑动 | 已完成 |
 | 参数编辑 | 通过反射编辑跳跃参数并在运行时生效 | 已完成 |
+| 额外后处理 | 独立暗角 Pass、配置、GPU 验证和窗口重建 | 已完成 |
 
 ## 01 构建基础
 
@@ -363,3 +364,55 @@ FXAA 关闭后仍声明输入和输出附件。验证发现，跳过它到 Vigne
 ### 验证结果
 
 Debug shader、编辑器和完整场景测试构建通过。默认延迟路径运行 432 帧，正常退出，修正依赖后日志中没有 `Validation Error`、`[error]` 或断言。新增的 3 组配置测试通过。GPU 像素读回、前向/FXAA 组合及窗口缩放验证记录在下一步。
+
+## 12 后处理验证
+
+日期：2026-11-14。暗角实现 `9a589de` 已推送。
+
+### 代码改动
+
+- `tests/vignette_gpu_tests.cpp`：建立离屏 render pass，输入已知 RGBA 颜色，调用生产代码的 VignettePass，将输出复制到主机可见 buffer 后检查实际像素。测试还销毁、重建图像及 framebuffer，重新绑定输入后再次执行。
+- `tests/post_process_smoke.cpp`：在默认世界中切换前向/延迟管线、暗角开关和三种窗口尺寸，并使用带偏移的游戏视口。
+- `scripts/test_post_process.py`：通过两份临时配置分别关闭、开启 FXAA，运行上述测试，并将 Vulkan validation error、引擎错误和断言作为失败处理。原始资源文件保持不变。
+- `tests/CMakeLists.txt`：添加两个显式运行的 GPU 测试目标；它们需要显示设备与 Vulkan。
+- `README.md`、`ARCHITECTURE.md`：补充配置含义、渲染顺序、附件流向及复现命令。
+
+### 设计思路
+
+GPU 测试直接执行新增的图形管线与 shader，读回输出颜色。它覆盖 CPU 配置测试无法确认的 push constant 布局、descriptor 绑定、实际视口坐标和附件重建。
+
+已知输入颜色为 `(0.8, 0.4, 0.2, 0.6)`。中心应保持该颜色，强度 0.6 的最外侧应保留 40% 的 RGB，alpha 始终保持 0.6。横向与竖向距离中心相同像素数的位置应有相同衰减，用于验证非正方形视口中的半径计算。设置为关闭和强度为零时，两份 GPU 输出逐字节相同。
+
+组合测试覆盖 `2 种管线 × 2 种 FXAA 状态 × 2 种暗角状态 × 3 种窗口尺寸`，共 24 种配置。每个配置绘制 6 帧，让交换链重建和后续帧都经过检查。
+
+### 阅读顺序
+
+先读 `vignette_gpu_tests.cpp` 的 `verifyViewport()`，了解像素断言，再读 `OffscreenVignette::render()` 的命令记录与读回。附件和保留规则在 `createRenderPass()`。随后看 `post_process_smoke.cpp` 的 `runScenarios()`，最后读 Python 脚本的临时配置和日志检查。
+
+### 验证结果
+
+| 检查 | 结果 |
+| --- | --- |
+| Debug、Release 编辑器和 shader 构建 | 通过 |
+| Debug、Release CTest | 各 4 个目标通过，包含原有 19 组运行时用例和新增 3 组暗角配置用例 |
+| GPU 像素读回 | Debug、Release 均通过，包含颜色、alpha、对称性、宽高比、偏移视口和重建后重新绑定 |
+| 后处理组合测试 | Debug、Release 各 24 种配置通过，无 Vulkan validation error |
+| 默认玩法回归 | Debug 运行 432 帧，跳跃和移动通过 |
+| 编辑器画面 | 场景边缘平滑变暗，中心与 UI 文字保持原样 |
+
+复制可执行文件到新临时 app 包时，进程停留在动态库加载阶段，界面工具连接超时。改用上一轮的 app 入口重启后，完成画面检查。临时阻塞进程已终止，测试包装文件位于忽略的 `build/` 目录。
+
+### 复现命令
+
+```sh
+cmake --preset macos-debug -DPICCOLO_BUILD_TESTS=ON
+cmake --build build/macos-debug --parallel 6 --target \
+  PiccoloEditor PiccoloAnimationTests PiccoloControllerTests PiccoloMotorTests PiccoloVignetteTests \
+  PiccoloVignetteGpuTests PiccoloPostProcessSmoke
+ctest --test-dir build/macos-debug --output-on-failure
+build/macos-debug/tests/PiccoloVignetteGpuTests
+python3 scripts/test_post_process.py \
+  build/macos-debug/tests/PiccoloPostProcessSmoke bin/Debug/PiccoloEditor.ini
+```
+
+Release 使用 `macos-release` 和 `bin/Release`。本步骤完成 PA02 中新增独立后处理 Pass 的选做要求。

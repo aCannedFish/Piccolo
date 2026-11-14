@@ -218,7 +218,7 @@ TransformComponent / AnimationComponent
 
 主相机中的 Pass 与 Vulkan subpass 的对应关系由 `MainCameraPass::setupRenderPass()`、各 Pass 的 `setupPipelines()` 和主相机的绘制函数共同确定。查找先后顺序时，读 `draw()`、`drawForward()`；查找输入输出图像时，读 `setupRenderPass()` 和 `RenderPipeline::initialize()`。
 
-`MainCameraPass::draw()` 的执行顺序是 G-buffer → 延迟光照 → 前向阶段的粒子绘制 → Tone Mapping → Color Grading → FXAA（启用时）→ UI → 合成。前向路径在场景绘制阶段调用 `drawMeshLighting()`、`drawSkybox()` 和粒子绘制，后续执行相同的后处理与 UI 流程。
+`MainCameraPass::draw()` 的执行顺序是 G-buffer → 延迟光照 → 前向阶段的粒子绘制 → Tone Mapping → Color Grading → FXAA（启用时）→ Vignette → UI → 合成。前向路径在场景绘制阶段调用 `drawMeshLighting()`、`drawSkybox()` 和粒子绘制，后续执行相同的后处理与 UI 流程。
 
 下表中的 C++ 文件均位于 `engine/source/runtime/function/render/passes/`，shader 均位于 `engine/shader/glsl/`。
 
@@ -230,6 +230,7 @@ TransformComponent / AnimationComponent
 | Tone Mapping | [tone_mapping_pass.cpp](engine/source/runtime/function/render/passes/tone_mapping_pass.cpp) | [tone_mapping.frag](engine/shader/glsl/tone_mapping.frag) |
 | Color Grading | [color_grading_pass.cpp](engine/source/runtime/function/render/passes/color_grading_pass.cpp) | [color_grading.frag](engine/shader/glsl/color_grading.frag) |
 | FXAA | [fxaa_pass.cpp](engine/source/runtime/function/render/passes/fxaa_pass.cpp) | `fxaa.vert / .frag` |
+| 暗角 | [vignette_pass.cpp](engine/source/runtime/function/render/passes/vignette_pass.cpp) | [vignette.frag](engine/shader/glsl/vignette.frag) |
 | ImGui 绘制 | [ui_pass.cpp](engine/source/runtime/function/render/passes/ui_pass.cpp) | 使用 ImGui Vulkan backend |
 | 场景与 UI 合成 | [combine_ui_pass.cpp](engine/source/runtime/function/render/passes/combine_ui_pass.cpp) | [combine_ui.frag](engine/shader/glsl/combine_ui.frag) |
 | 物体拾取 | [pick_pass.cpp](engine/source/runtime/function/render/passes/pick_pass.cpp) | `mesh_inefficient_pick.vert / .frag` |
@@ -237,6 +238,8 @@ TransformComponent / AnimationComponent
 | 天空盒、编辑器操作轴 | `main_camera_pass.cpp` 中的 `drawSkybox()`、`drawAxis()` | `skybox.vert / .frag`、`axis.vert / .frag` |
 
 Tone Mapping、Color Grading 等后处理使用 [post_process.vert](engine/shader/glsl/post_process.vert) 绘制全屏三角形。`color_grading.frag` 在横向排列的两个蓝色切片之间插值，红绿通道使用线性过滤，alpha 保留输入值。LUT 只创建一个 mip 层级，并显式采样第 0 层，避免切片间串色。默认暖色 LUT 由 [生成脚本](scripts/generate_color_lut.py) 生成。
+
+VignettePass 读取 `backup_buffer_odd`，将暗化后的场景写入已有的 `post_process_buffer_even`。UI subpass 保留这个附件，CombineUIPass 将它与 UI 附件合成。视口和效果参数通过 32 字节 push constants 传入 shader，运行时修改参数不会重建管线。配置与代码入口见 [VignetteSettings](engine/source/runtime/resource/res_type/data/vignette_settings.h) 和 `RenderSystem::setVignetteSettings()`。
 
 ### 共用代码
 
@@ -284,7 +287,7 @@ Tone Mapping、Color Grading 等后处理使用 [post_process.vert](engine/shade
 | [asset/objects/](engine/asset/objects/) | 对象定义、组件数据、模型、材质和动画资源，按角色、环境等分组 |
 | [asset/objects/basic/](engine/asset/objects/basic/) | 立方体、球、胶囊等基础模型 |
 | [asset/texture/](engine/asset/texture/) | 默认纹理、天空盒、IBL、BRDF LUT、调色 LUT 等共用纹理 |
-| [rendering.global.json](engine/asset/global/rendering.global.json) | 天空盒、IBL、BRDF LUT、调色 LUT、环境光、方向光、初始相机与 FXAA 配置 |
+| [rendering.global.json](engine/asset/global/rendering.global.json) | 天空盒、IBL、BRDF LUT、调色 LUT、环境光、方向光、初始相机、FXAA 与暗角配置 |
 | [particle.global.json](engine/asset/global/particle.global.json) | 粒子模拟与渲染的全局参数 |
 | [configs/development/](engine/configs/development/) | 开发启动配置模板 |
 | [configs/deployment/](engine/configs/deployment/) | 部署启动配置模板，随可执行程序复制到输出目录 |

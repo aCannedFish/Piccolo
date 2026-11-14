@@ -110,18 +110,34 @@ For documentation, please refer to the Wiki section.
 
 ## 课程实现
 
-本分支参考 [GAMES104 课程作业](https://games104.boomingtech.com/sc/course-work/)，实现了 LUT 调色、走跑跳动画、角色碰撞与跳跃参数编辑。修改原因、设计说明、代码阅读顺序和验证结果见 [LOG.md](LOG.md)。模块索引见 [ARCHITECTURE.md](ARCHITECTURE.md)。
+本分支参考 [GAMES104 课程作业](https://games104.boomingtech.com/sc/course-work/)，实现了 LUT 调色、暗角后处理、走跑跳动画、角色碰撞与跳跃参数编辑。修改原因、设计说明、代码阅读顺序和验证结果见 [LOG.md](LOG.md)。模块索引见 [ARCHITECTURE.md](ARCHITECTURE.md)。
 
 默认角色支持 WASD 移动、Shift 加速、空格跳跃。编辑器选中 Player 后，展开 MotorComponent → MotorComponentRes，可修改 `m_jump_initial_speed`；`m_use_jump_initial_speed` 控制使用初速度还是原来的跳跃高度。
 
+## 暗角配置
+
+独立的 VignettePass 位于 FXAA 之后、UI 合成之前。它让场景边缘逐渐变暗，保持界面文字的原始亮度。配置在 [rendering.global.json](engine/asset/global/rendering.global.json) 的 `vignette` 字段：
+
+```json
+"vignette": {
+  "enabled": true,
+  "strength": 0.35,
+  "inner_radius": 0.5,
+  "outer_radius": 1.5
+}
+```
+
+`strength` 范围为 0 到 1，内外半径控制暗化的起止位置。半径 1 等于半个游戏视口高度。将 `enabled` 设为 false 可关闭效果。修改资源后重新构建并启动编辑器；程序中可调用 `RenderSystem::setVignetteSettings()`，让参数在下一帧生效。
+
 ## 运行测试
 
-运行时回归测试使用 CTest，覆盖动画融合与状态切换、Jolt 碰撞和参数反射。测试直接链接生产运行时，无须创建窗口。macOS Debug 的命令如下：
+运行时回归测试使用 CTest，覆盖动画融合与状态切换、Jolt 碰撞、参数反射和暗角配置。测试直接链接生产运行时，无须创建窗口。macOS Debug 的命令如下：
 
 ```sh
 cmake --preset macos-debug -DPICCOLO_BUILD_TESTS=ON
 cmake --build build/macos-debug --parallel 6 --target \
-  PiccoloEditor PiccoloAnimationTests PiccoloControllerTests PiccoloMotorTests PiccoloGameplaySmoke
+  PiccoloEditor PiccoloAnimationTests PiccoloControllerTests PiccoloMotorTests PiccoloVignetteTests \
+  PiccoloGameplaySmoke PiccoloVignetteGpuTests PiccoloPostProcessSmoke
 ctest --test-dir build/macos-debug --output-on-failure
 python3 -m unittest discover -s tests -p 'test_color_lut.py' -v
 ```
@@ -132,6 +148,14 @@ Release 使用 `macos-release` preset 和 `build/macos-release` 目录。其他�
 
 ```sh
 build/macos-debug/tests/PiccoloGameplaySmoke "$PWD/bin/Debug/PiccoloEditor.ini"
+```
+
+暗角 GPU 测试会读回实际像素，检查颜色、alpha、视口偏移与 framebuffer 重建。后处理组合测试使用临时配置，覆盖前向/延迟、FXAA 开关、暗角开关和窗口缩放，并检查 Vulkan 日志。两者同样需要显示设备和 Vulkan：
+
+```sh
+build/macos-debug/tests/PiccoloVignetteGpuTests
+python3 scripts/test_post_process.py \
+  build/macos-debug/tests/PiccoloPostProcessSmoke bin/Debug/PiccoloEditor.ini
 ```
 
 调色 LUT 可用标准库脚本重新生成：
