@@ -260,6 +260,22 @@ namespace Piccolo
             }
             else
             {
+#if defined(__APPLE__)
+                // GLFW reports two-finger scrolling as scroll offsets.
+                // Option uses both axes for camera rotation while ordinary scrolling keeps zooming.
+                GLFWwindow* window = g_editor_global_context.m_window_system->getWindow();
+                const bool option_pressed = glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS ||
+                                            glfwGetKey(window, GLFW_KEY_RIGHT_ALT) == GLFW_PRESS;
+                if (option_pressed)
+                {
+                    // Scroll offsets use their own scale, independent of viewport pixel dimensions.
+                    constexpr float degrees_per_scroll_unit = 1.0f;
+                    const Vector2 rotation_delta(-static_cast<float>(yoffset), static_cast<float>(xoffset));
+                    g_editor_global_context.m_scene_manager->getEditorCamera()->rotate(
+                        rotation_delta * degrees_per_scroll_unit);
+                    return;
+                }
+#endif
                 g_editor_global_context.m_scene_manager->getEditorCamera()->zoom(
                     (float)yoffset * 2.0f); // wheel scrolled up = zoom in by 2 extra degrees
             }

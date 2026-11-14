@@ -114,6 +114,8 @@ For documentation, please refer to the Wiki section.
 
 默认角色支持 WASD 移动、Shift 加速、空格跳跃。编辑器选中 Player 后，展开 MotorComponent → MotorComponentRes，可修改 `m_jump_initial_speed`；`m_use_jump_initial_speed` 控制使用初速度还是原来的跳跃高度。
 
+macOS 触控板在编辑器模式下支持“Option + 双指滑动”旋转视角：将指针放在场景视口内，按住任一侧 Option，横向滑动控制左右转动，纵向滑动控制俯仰。不按 Option 时，双指上下滑动仍用于缩放。该操作无需按下触控板。
+
 ## 暗角配置
 
 独立的 VignettePass 位于 FXAA 之后、UI 合成之前。它让场景边缘逐渐变暗，保持界面文字的原始亮度。配置在 [rendering.global.json](engine/asset/global/rendering.global.json) 的 `vignette` 字段：
