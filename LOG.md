@@ -7,7 +7,7 @@
 | 任务 | 目标 | 状态 |
 | --- | --- | --- |
 | 构建基础 | 整理现有 macOS 适配，验证编辑器构建 | 已完成构建检查 |
-| 调色 | 验证二维 LUT 插值，提供可复现的自定义 LUT | 待实现 |
+| 调色 | 验证二维 LUT 插值，提供可复现的自定义 LUT | 已完成 |
 | 动画融合 | 多片段采样、逐骨骼权重和旋转插值 | 待实现 |
 | 动画切换 | 根据运动状态切换走、跑、跳动画 | 待实现 |
 | 角色碰撞 | 形状扫描、平台落地、墙面滑动 | 待实现 |
@@ -50,3 +50,38 @@
 - 架构文档的本地文件链接检查通过。
 
 本节完成构建验证。编辑器运行检查及功能测试记录在后续任务中。
+
+## 02 调色
+
+日期：2026-11-14。基础提交 `e83563a` 已推送。
+
+### 代码改动
+
+- `engine/shader/glsl/color_grading.frag`：保留已有的三线性插值算法，使用完整变量名，补充色彩空间、切片布局、texel 中心和插值过程的注释，并统一换行。
+- `scripts/generate_color_lut.py`：新增只依赖 Python 标准库的 LUT 生成器，支持 identity 和 warm 两种映射，输出带校验和的 RGB PNG。
+- `engine/asset/texture/lut/color_grading_warm.png`：新增 256 × 16 的暖色 LUT；`rendering.global.json` 默认加载该资源。
+- `tests/test_color_lut.py`：验证恒等映射、切片交界、输入钳制、暖色映射量化误差和资源可重复生成。
+
+### 设计思路
+
+对应 PA02 的 Color Grading 与自定义 LUT 要求。Tone Mapping 的输出已经是 sRGB，LUT 直接存储调整后的 sRGB 值。暖色映射略微增加红绿通道的交叉贡献，并降低蓝通道。生成公式的每行系数和不超过 1，输出保持在有效范围内。
+
+红绿通道使用纹理的线性过滤，蓝通道使用两个切片之间的插值。红色到达 1 时仍采样本切片的最后一个 texel 中心，避免相邻切片串色。alpha 从输入保留。
+
+### 阅读顺序
+
+从 `rendering.global.json` 的 `color_grading_map` 开始，沿 `RenderSystem::initialize()`、`RenderResource::uploadGlobalRenderResource()`、`ColorGradingPass::setupDescriptorSet()` 找到纹理绑定，再读片元 shader。LUT 的布局和调色公式见生成脚本。
+
+重新生成默认资源：
+
+```sh
+python3 scripts/generate_color_lut.py engine/asset/texture/lut/color_grading_warm.png
+python3 -m unittest discover -s tests -p 'test_color_lut.py' -v
+cmake --build --preset macos-debug --parallel 6
+```
+
+### 验证结果
+
+4 项数值与资源测试通过，200 个固定随机样本的误差均在半个 8-bit 量化级以内。Debug shader 编译和编辑器链接成功。CPU 测试检查采样约定与资源数据，shader 另由 glslang 编译验证。
+
+基础编辑器进程成功初始化渲染、加载默认世界及 29 个刚体，日志未出现 validation error。当前 UI 工具无法绑定此独立可执行文件的窗口，画面和交互尚未人工验收。PA02 的额外后处理 Pass 属于选做项，本任务范围为调色与自定义 LUT。
