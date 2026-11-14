@@ -28,7 +28,8 @@ void main()
     upper_uv /= vec2(lut_size);
 
     // Hardware filters red and green. This interpolation supplies the blue axis.
-    highp vec3 lower_color = texture(color_grading_lut_texture_sampler, lower_uv).rgb;
-    highp vec3 upper_color = texture(color_grading_lut_texture_sampler, upper_uv).rgb;
+    // Color coordinates can jump between slices in adjacent pixels. Use the original LUT level.
+    highp vec3 lower_color = textureLod(color_grading_lut_texture_sampler, lower_uv, 0.0).rgb;
+    highp vec3 upper_color = textureLod(color_grading_lut_texture_sampler, upper_uv, 0.0).rgb;
     out_color = vec4(mix(lower_color, upper_color, slice_weight), color.a);
 }

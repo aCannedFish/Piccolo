@@ -256,3 +256,26 @@ Debug 编辑器、动画、控制器和 Motor 测试构建通过，CTest 三个�
 ### 验证结果
 
 Debug 编辑器与三个 CTest 目标通过。Motor 测试增至 4 组，空控制器保存为 null，重载后保留跳跃参数且不触发断言。
+
+## 09 调色层级
+
+日期：2026-11-14。空指针修复 `63e7528` 已推送。
+
+### 问题原因
+
+实际 GPU 画面在天空和墙面上出现了有色轮廓。`createGlobalImage()` 默认自动生成 mipmap；片元 shader 根据相邻像素的颜色坐标隐式选择层级。LUT 的二维布局在蓝色切片边界处不连续，低分辨率 mipmap 会混入相邻切片的颜色。
+
+### 代码改动
+
+- `RenderResource::uploadGlobalRenderResource()`：为 Color Grading LUT 显式指定一个 mip 层级，避免生成无效的下采样数据。
+- `color_grading.frag`：用 `textureLod(..., 0.0)` 采样原始 LUT，保持每个像素独立的颜色映射。
+
+### 阅读顺序
+
+从全局资源上传的 `createGlobalImage()` 参数进入 VulkanUtil，检查默认 mip 层级的生成逻辑，再对照 shader 中的显式层级采样。两次采样后的蓝通道插值保持不变。
+
+### 验证结果
+
+Debug shader 和编辑器构建通过。使用构建目录中的临时 macOS app 包连接 UI 工具，重启编辑器后观察相同场景：天空、墙面和地面的彩色轮廓消失，颜色过渡连续。
+
+此次界面检查还确认 Player → MotorComponent → MotorComponentRes 中显示了 `m_use_jump_initial_speed` 复选框和数值为 4.500 的 `m_jump_initial_speed` 输入框。临时 app 包仅用于测试，位于忽略的 `build/` 目录。
