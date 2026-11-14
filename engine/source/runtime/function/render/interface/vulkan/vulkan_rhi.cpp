@@ -794,14 +794,32 @@ namespace Piccolo
             physical_device_features.geometryShader = VK_TRUE;
         }
 
+        // Portability devices require this extension when they advertise it (VUID 04451).
+        // Keep it optional during device selection so native Vulkan devices remain eligible.
+        uint32_t extension_count = 0;
+        vkEnumerateDeviceExtensionProperties(m_physical_device, nullptr, &extension_count, nullptr);
+        std::vector<VkExtensionProperties> available_extensions(extension_count);
+        vkEnumerateDeviceExtensionProperties(
+            m_physical_device, nullptr, &extension_count, available_extensions.data());
+
+        std::vector<const char*> enabled_extensions = m_device_extensions;
+        for (const VkExtensionProperties& extension : available_extensions)
+        {
+            if (std::string(extension.extensionName) == "VK_KHR_portability_subset")
+            {
+                enabled_extensions.push_back("VK_KHR_portability_subset");
+                break;
+            }
+        }
+
         // device create info
         VkDeviceCreateInfo device_create_info {};
         device_create_info.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
         device_create_info.pQueueCreateInfos       = queue_create_infos.data();
         device_create_info.queueCreateInfoCount    = static_cast<uint32_t>(queue_create_infos.size());
         device_create_info.pEnabledFeatures        = &physical_device_features;
-        device_create_info.enabledExtensionCount   = static_cast<uint32_t>(m_device_extensions.size());
-        device_create_info.ppEnabledExtensionNames = m_device_extensions.data();
+        device_create_info.enabledExtensionCount   = static_cast<uint32_t>(enabled_extensions.size());
+        device_create_info.ppEnabledExtensionNames = enabled_extensions.data();
         device_create_info.enabledLayerCount       = 0;
 
         if (vkCreateDevice(m_physical_device, &device_create_info, nullptr, &m_device) != VK_SUCCESS)

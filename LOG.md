@@ -84,4 +84,26 @@ cmake --build --preset macos-debug --parallel 6
 
 4 项数值与资源测试通过，200 个固定随机样本的误差均在半个 8-bit 量化级以内。Debug shader 编译和编辑器链接成功。CPU 测试检查采样约定与资源数据，shader 另由 glslang 编译验证。
 
-基础编辑器进程成功初始化渲染、加载默认世界及 29 个刚体，日志未出现 validation error。当前 UI 工具无法绑定此独立可执行文件的窗口，画面和交互尚未人工验收。PA02 的额外后处理 Pass 属于选做项，本任务范围为调色与自定义 LUT。
+基础编辑器进程成功初始化渲染、加载默认世界及 29 个刚体。完整启动日志中存在 `VK_KHR_portability_subset` 未启用的 validation error，修复记录见下一节。当前 UI 工具无法绑定此独立可执行文件的窗口，画面和交互尚未人工验收。PA02 的额外后处理 Pass 属于选做项，本任务范围为调色与自定义 LUT。
+
+## 03 设备扩展
+
+日期：2026-11-14。调色提交 `22c9992` 已推送。
+
+### 问题原因
+
+启动日志报告 `VUID-VkDeviceCreateInfo-pProperties-04451`。根据 [Vulkan 设备创建规则](https://docs.vulkan.org/refpages/latest/refpages/source/VkDeviceCreateInfo.html)，设备提供 `VK_KHR_portability_subset` 时，创建逻辑设备必须启用该扩展。当前 macOS 的 MoltenVK 提供此扩展。
+
+### 代码改动
+
+修改 `VulkanRHI::createLogicalDevice()`：枚举选中物理设备的扩展，将其提供的 portability subset 加入本次设备创建列表。设备筛选仍使用原有必需扩展列表；其他平台的原生 Vulkan 设备可以继续使用。
+
+### 阅读顺序
+
+先看 `checkDeviceExtensionSupport()` 的设备筛选，再看 `createLogicalDevice()` 中的扩展枚举和 `VkDeviceCreateInfo`。扩展名称使用字符串，与仓库中的旧版 Vulkan 头文件兼容。
+
+### 验证结果
+
+Debug 构建通过。重新启动编辑器并等待默认世界加载完成，再运行两秒；进程保持运行，日志中没有 `Validation Error` 或 `[error]`。本次启动加载了新的暖色 LUT。检查完成后终止测试进程。
+
+同时更正上一节最初遗漏的 validation error 记录。
