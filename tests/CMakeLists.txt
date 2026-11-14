@@ -12,6 +12,10 @@ add_executable(PiccoloMotorTests motor_tests.cpp)
 target_link_libraries(PiccoloMotorTests PRIVATE PiccoloRuntime)
 add_test(NAME PiccoloMotorTests COMMAND PiccoloMotorTests)
 
+add_executable(PiccoloVignetteTests vignette_tests.cpp)
+target_link_libraries(PiccoloVignetteTests PRIVATE PiccoloRuntime)
+add_test(NAME PiccoloVignetteTests COMMAND PiccoloVignetteTests)
+
 # This executable needs a display and Vulkan. Run it explicitly with an editor INI path.
 add_executable(PiccoloGameplaySmoke gameplay_smoke.cpp)
 target_link_libraries(PiccoloGameplaySmoke PRIVATE PiccoloRuntime)

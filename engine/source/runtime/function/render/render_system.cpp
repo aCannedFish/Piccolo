@@ -77,6 +77,7 @@ namespace Piccolo
         // initialize render pipeline
         RenderPipelineInitInfo pipeline_init_info;
         pipeline_init_info.enable_fxaa     = global_rendering_res.m_enable_fxaa;
+        pipeline_init_info.vignette = global_rendering_res.m_vignette;
         pipeline_init_info.render_resource = m_render_resource;
 
         m_render_pipeline        = std::make_shared<RenderPipeline>();
@@ -235,6 +236,11 @@ namespace Piccolo
     void RenderSystem::clearForLevelReloading()
     {
         m_render_scene->clearForLevelReloading();
+    }
+
+    void RenderSystem::setVignetteSettings(const VignetteSettings& settings)
+    {
+        static_cast<RenderPipeline*>(m_render_pipeline.get())->setVignetteSettings(settings);
     }
 
     void RenderSystem::setRenderPipelineType(RENDER_PIPELINE_TYPE pipeline_type)

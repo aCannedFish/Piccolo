@@ -2,6 +2,7 @@
 
 #include "runtime/core/math/vector2.h"
 #include "runtime/function/render/render_pass_base.h"
+#include "runtime/resource/res_type/data/vignette_settings.h"
 
 #include <memory>
 #include <vector>
@@ -15,6 +16,7 @@ namespace Piccolo
     struct RenderPipelineInitInfo
     {
         bool                                enable_fxaa {false};
+        VignetteSettings vignette;
         std::shared_ptr<RenderResourceBase> render_resource;
     };
 
@@ -44,6 +46,7 @@ namespace Piccolo
         std::shared_ptr<RenderPassBase> m_main_camera_pass;
         std::shared_ptr<RenderPassBase> m_color_grading_pass;
         std::shared_ptr<RenderPassBase> m_fxaa_pass;
+        std::shared_ptr<RenderPassBase> m_vignette_pass;
         std::shared_ptr<RenderPassBase> m_tone_mapping_pass;
         std::shared_ptr<RenderPassBase> m_ui_pass;
         std::shared_ptr<RenderPassBase> m_combine_ui_pass;

@@ -5,6 +5,7 @@
 #include "runtime/core/math/vector3.h"
 
 #include "runtime/resource/res_type/data/camera_config.h"
+#include "runtime/resource/res_type/data/vignette_settings.h"
 
 namespace Piccolo
 {
@@ -53,6 +54,7 @@ namespace Piccolo
 
     public:
         bool                m_enable_fxaa {false};
+        VignetteSettings m_vignette;
         SkyBoxIrradianceMap m_skybox_irradiance_map;
         SkyBoxSpecularMap   m_skybox_specular_map;
         std::string         m_brdf_map;

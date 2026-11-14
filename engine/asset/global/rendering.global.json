@@ -1,5 +1,11 @@
 {
   "enable_fxaa": false,
+  "vignette": {
+    "enabled": true,
+    "strength": 0.35,
+    "inner_radius": 0.5,
+    "outer_radius": 1.5
+  },
   "skybox_irradiance_map": {
     "negative_x_map": "asset/texture/sky/skybox_irradiance_X-.hdr",
     "positive_x_map": "asset/texture/sky/skybox_irradiance_X+.hdr",

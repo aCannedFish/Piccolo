@@ -332,3 +332,34 @@ build/macos-release/tests/PiccoloGameplaySmoke "$PWD/bin/Release/PiccoloEditor.i
 - [PA04](https://cdn.boomingtech.com/games104_static/upload/PA04%EF%BC%9ATool%20Chains.pdf)：完成新参数反射、面板显示、序列化及运行时生效。
 
 各步骤均独立提交并推送。课程的额外后处理 Pass 等选做扩展未纳入本次实现；本次未执行课程平台提交。跨平台构建配置保留，本轮实际验证环境为 macOS。
+
+## 11 暗角效果
+
+日期：2026-11-14。继续实现 PA02 的额外后处理 Pass，起点为 `21a3116`。
+
+### 代码改动
+
+- `vignette_pass.cpp/.h`、`vignette.frag`：增加独立 VignettePass，在场景边缘进行平滑暗化，保留中心亮度和输入 alpha。
+- `vignette_settings.h`、`GlobalRenderingRes`、`rendering.global.json`：增加反射配置，包含开关、强度、内半径和外半径。默认场景启用强度 0.35 的暗角，旧 JSON 缺少配置时关闭效果。
+- `RenderPipeline`、`MainCameraPass`：在 FXAA 与 UI 之间增加 subpass，接入前向、延迟两条绘制路径，以及 framebuffer 重建后的 descriptor 更新。
+- `RenderSystem::setVignetteSettings()`：支持下一帧更新效果参数，无须重建图形管线。
+- `RHI`、`VulkanRHI`：补充 push constant 记录命令，并让 pipeline layout 正确传递已有的 push constant range 字段。descriptor pool 增加一个 input attachment 和一个 set 的容量。
+- `tests/vignette_tests.cpp`：增加旧配置兼容、参数边界和序列化测试。
+
+### 设计思路
+
+渲染顺序为 `Tone Mapping → Color Grading → FXAA → Vignette → UI → Combine UI`。Vignette 读取完成抗锯齿的场景颜色，输出到已有的 `post_process_buffer_even`。UI 绘制期间保留这份结果，最终合成时再叠加 UI，因此文字和编辑器控件保持原有亮度。
+
+暗角按像素到视口中心的距离计算，半径 1 表示半个视口高度。shader 使用视口原点和宽高计算距离，编辑器中的偏移视口和非正方形窗口都可以保持圆形等距线。内外半径之间使用 smoothstep，边缘颜色乘以 `1 - strength × weight`。关闭效果时仍绘制该 subpass，强度为零，保持固定的附件传递路径。
+
+每次 draw 将视口和效果参数写入 32 字节 push constants。参数随命令记录，多帧并行时没有共享 uniform buffer 的写入冲突。shader 只读取当前像素，适合使用 input attachment。
+
+FXAA 关闭后仍声明输入和输出附件。验证发现，跳过它到 Vignette 的依赖会触发 render pass 错误。因此保留 `FXAA → Vignette` 的执行顺序，并添加 `Color Grading → Vignette` 的直接颜色依赖。Vignette 输出另有到 Combine UI 的读取依赖。
+
+### 阅读顺序
+
+先看 `rendering.global.json` 的 `vignette` 和 `VignetteSettings`，了解参数。再从 `RenderSystem::initialize()` 跟到 `RenderPipeline::initialize()`，查看 Pass 的创建和输入绑定。随后读 `MainCameraPass::setupRenderPass()` 中新增的附件引用、保留附件和依赖，最后读 `VignettePass::draw()` 与 `vignette.frag`。窗口变化时的处理入口是 `RenderPipeline::passUpdateAfterRecreateSwapchain()`。
+
+### 验证结果
+
+Debug shader、编辑器和完整场景测试构建通过。默认延迟路径运行 432 帧，正常退出，修正依赖后日志中没有 `Validation Error`、`[error]` 或断言。新增的 3 组配置测试通过。GPU 像素读回、前向/FXAA 组合及窗口缩放验证记录在下一步。

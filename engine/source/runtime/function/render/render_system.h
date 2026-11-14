@@ -4,6 +4,7 @@
 #include "runtime/function/render/render_guid_allocator.h"
 #include "runtime/function/render/render_swap_context.h"
 #include "runtime/function/render/render_type.h"
+#include "runtime/resource/res_type/data/vignette_settings.h"
 
 #include <array>
 #include <memory>
@@ -50,6 +51,8 @@ namespace Piccolo
         std::shared_ptr<RHI>          getRHI() const;
 
         void      setRenderPipelineType(RENDER_PIPELINE_TYPE pipeline_type);
+        // Changes the next frame's vignette without rebuilding pipelines or framebuffers.
+        void setVignetteSettings(const VignetteSettings& settings);
         void      initializeUIRenderBackend(WindowUI* window_ui);
         void      updateEngineContentViewport(float offset_x, float offset_y, float width, float height);
         uint32_t  getGuidOfPickedMesh(const Vector2& picked_uv);

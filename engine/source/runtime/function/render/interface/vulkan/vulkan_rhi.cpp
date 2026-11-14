@@ -1500,6 +1500,16 @@ namespace Piccolo
         create_info.setLayoutCount = pCreateInfo->setLayoutCount;
         create_info.pSetLayouts = vk_descriptor_set_layout_list.data();
 
+        // Preserve the RHI push-constant declaration when creating the Vulkan layout.
+        std::vector<VkPushConstantRange> push_constant_ranges(pCreateInfo->pushConstantRangeCount);
+        for (uint32_t index = 0; index < pCreateInfo->pushConstantRangeCount; ++index)
+        {
+            const RHIPushConstantRange& range = pCreateInfo->pPushConstantRanges[index];
+            push_constant_ranges[index] = {static_cast<VkShaderStageFlags>(range.stageFlags), range.offset, range.size};
+        }
+        create_info.pushConstantRangeCount = static_cast<uint32_t>(push_constant_ranges.size());
+        create_info.pPushConstantRanges = push_constant_ranges.data();
+
         pPipelineLayout = new VulkanPipelineLayout();
         VkPipelineLayout vk_pipeline_layout;
         VkResult result = vkCreatePipelineLayout(m_device, &create_info, nullptr, &vk_pipeline_layout);
@@ -2512,6 +2522,18 @@ namespace Piccolo
             vk_image_memory_barrier_list.data());
     }
 
+    void VulkanRHI::cmdPushConstants(RHICommandBuffer* command_buffer,
+                                     RHIPipelineLayout* layout,
+                                     RHIShaderStageFlags stage_flags,
+                                     uint32_t offset,
+                                     uint32_t size,
+                                     const void* values)
+    {
+        vkCmdPushConstants(static_cast<VulkanCommandBuffer*>(command_buffer)->getResource(),
+                           static_cast<VulkanPipelineLayout*>(layout)->getResource(),
+                           static_cast<VkShaderStageFlags>(stage_flags), offset, size, values);
+    }
+
     void VulkanRHI::cmdDraw(RHICommandBuffer* commandBuffer, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance)
     {
         vkCmdDraw(((VulkanCommandBuffer*)commandBuffer)->getResource(), vertexCount, instanceCount, firstVertex, firstInstance);
@@ -2653,7 +2675,7 @@ namespace Piccolo
         pool_sizes[3].type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         pool_sizes[3].descriptorCount = 3 + 5 * m_max_material_count + 1 + 1; // ImGui_ImplVulkan_CreateDeviceObjects
         pool_sizes[4].type            = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-        pool_sizes[4].descriptorCount = 4 + 1 + 1 + 2;
+        pool_sizes[4].descriptorCount = 4 + 1 + 1 + 2 + 1; // Main camera, tone map, grading, UI, vignette.
         pool_sizes[5].type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
         pool_sizes[5].descriptorCount = 3;
         pool_sizes[6].type            = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
@@ -2664,7 +2686,7 @@ namespace Piccolo
         pool_info.poolSizeCount = sizeof(pool_sizes) / sizeof(pool_sizes[0]);
         pool_info.pPoolSizes    = pool_sizes;
         pool_info.maxSets =
-            1 + 1 + 1 + m_max_material_count + m_max_vertex_blending_mesh_count + 1 + 1; // +skybox + axis descriptor set
+            1 + 1 + 1 + m_max_material_count + m_max_vertex_blending_mesh_count + 1 + 1 + 1; // +skybox + axis descriptor set
         pool_info.flags = 0U;
 
         if (vkCreateDescriptorPool(m_device, &pool_info, nullptr, &m_vk_descriptor_pool) != VK_SUCCESS)

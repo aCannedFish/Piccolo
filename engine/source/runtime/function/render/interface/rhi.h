@@ -119,6 +119,14 @@ namespace Piccolo
         virtual void resetCommandPool() = 0;
         virtual void waitForFences() = 0;
 
+        // Record small draw parameters directly into the command buffer.
+        virtual void cmdPushConstants(RHICommandBuffer* command_buffer,
+                                      RHIPipelineLayout* layout,
+                                      RHIShaderStageFlags stage_flags,
+                                      uint32_t offset,
+                                      uint32_t size,
+                                      const void* values) = 0;
+
         // query
         virtual void getPhysicalDeviceProperties(RHIPhysicalDeviceProperties* pProperties) = 0;
         virtual RHICommandBuffer* getCurrentCommandBuffer() const = 0;

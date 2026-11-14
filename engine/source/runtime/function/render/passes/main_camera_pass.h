@@ -5,6 +5,7 @@
 #include "runtime/function/render/passes/color_grading_pass.h"
 #include "runtime/function/render/passes/combine_ui_pass.h"
 #include "runtime/function/render/passes/fxaa_pass.h"
+#include "runtime/function/render/passes/vignette_pass.h"
 #include "runtime/function/render/passes/tone_mapping_pass.h"
 #include "runtime/function/render/passes/ui_pass.h"
 #include "runtime/function/render/passes/particle_pass.h"
@@ -61,6 +62,7 @@ namespace Piccolo
 
         void draw(ColorGradingPass& color_grading_pass,
             FXAAPass& fxaa_pass,
+            VignettePass& vignette_pass,
             ToneMappingPass& tone_mapping_pass,
             UIPass& ui_pass,
             CombineUIPass& combine_ui_pass,
@@ -69,6 +71,7 @@ namespace Piccolo
 
         void drawForward(ColorGradingPass& color_grading_pass,
             FXAAPass& fxaa_pass,
+            VignettePass& vignette_pass,
             ToneMappingPass& tone_mapping_pass,
             UIPass& ui_pass,
             CombineUIPass& combine_ui_pass,
