@@ -11,7 +11,7 @@
 | 动画融合 | 多片段采样、逐骨骼权重和旋转插值 | 已完成 |
 | 动画切换 | 根据运动状态切换走、跑、跳动画 | 已完成 |
 | 角色碰撞 | 形状扫描、平台落地、墙面滑动 | 已完成 |
-| 参数编辑 | 通过反射编辑跳跃参数并在运行时生效 | 待实现 |
+| 参数编辑 | 通过反射编辑跳跃参数并在运行时生效 | 已完成 |
 
 ## 01 构建基础
 
@@ -207,3 +207,32 @@ walk_run 使用速度比例 1、2 作为走和跑的采样点。权重决定混�
 ### 验证结果
 
 Debug 编辑器及测试构建通过。动画测试增加到 9 组，控制器 6 组继续通过。新增测试覆盖跳跃优先级、提前落地、重新起跳、停止后恢复移动，以及真实玩家资源的 idle → walk → jump → land → idle 播放。还验证了速度中点的 0.5/0.5 权重、共享相位和旧资源循环兼容性。
+
+## 07 跳跃参数
+
+日期：2026-11-14。动画切换提交 `d19e5b6` 已推送。
+
+### 代码改动
+
+- `MotorComponentRes`：新增 `m_use_jump_initial_speed` 和 `m_jump_initial_speed`，分别控制参数模式和竖直起跳速度，单位为米每秒。类已有 `Fields` 标签，新字段自动参与反射和序列化。
+- `MotorComponent`：新增 `calculateJumpInitialSpeed()`。起跳时读取当前参数，速度模式直接使用初速度，高度模式使用 `sqrt(2gh)`。负参数按零处理。
+- `player.object.json`：默认启用 4.5 米每秒的初速度；移除每帧覆盖跳跃高度并输出日志的演示 Lua 组件。
+- `tests/motor_tests.cpp`：检查两种参数模式、生成的反射访问器、保存与重新读取、旧资源默认行为。
+
+### 设计思路
+
+对应 PA04 的参数反射和运行时生效要求。已有资源缺少模式字段时默认使用高度模式，原来的跳跃高度保持有效。默认玩家使用速度模式，参数在每次起跳时求值，空中修改参数不会直接重置当前速度。
+
+编辑器已为 `bool` 注册 Checkbox、为 `float` 注册 InputFloat。`createClassUI()` 递归展开 MotorComponent 的 `m_motor_res`，即可显示新字段。无需为该组件增加专用面板。
+
+### 阅读顺序
+
+先读 `resource/res_type/components/motor.h` 的字段和默认值，再看 `MotorComponent::calculateJumpInitialSpeed()` 及 `calculatedDesiredVerticalMoveSpeed()` 的调用。跟踪 UI 时，从 `EditorUI::createClassUI()` 进入 `createLeafNodeUI()`，查找 `m_editor_ui_creator` 的 bool 与 float 控件。
+
+使用时选中 Player，展开 Components Details → MotorComponent → m_motor_res。勾选 `m_use_jump_initial_speed` 后编辑 `m_jump_initial_speed`，进入游戏模式按空格测试；取消勾选后使用 `m_jump_height`。
+
+### 验证结果
+
+Debug 编辑器、动画、控制器和 Motor 测试构建通过，CTest 三个目标全部通过。新增 3 组 Motor 用例覆盖高度公式、速度直接设置、负值、反射修改后计算结果、JSON 保存与重载、旧资源保持高度模式。
+
+反射用例使用与默认玩家相同的 PhysicsControllerConfig，检查完整组件资源的序列化。面板控件类型已经通过生成元数据和现有 UI 注册代码核对，交互画面仍待人工查看。

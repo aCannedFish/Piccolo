@@ -117,6 +117,15 @@ namespace Piccolo
         m_move_speed_ratio = std::clamp(m_move_speed_ratio, min_speed_ratio, max_speed_ratio);
     }
 
+    float MotorComponent::calculateJumpInitialSpeed(const MotorComponentRes& resource, float gravity)
+    {
+        if (resource.m_use_jump_initial_speed)
+        {
+            return std::max(resource.m_jump_initial_speed, 0.f);
+        }
+        return Math::sqrt(2.f * std::max(gravity, 0.f) * std::max(resource.m_jump_height, 0.f));
+    }
+
     void MotorComponent::calculatedDesiredVerticalMoveSpeed(unsigned int command, float delta_time)
     {
         std::shared_ptr<PhysicsScene> physics_scene =
@@ -127,10 +136,12 @@ namespace Piccolo
 
         if (m_jump_state == JumpState::idle)
         {
-            if (m_motor_res.m_jump_height > 0.f && ((unsigned int)GameCommand::jump & command))
+            // Read reflected parameters at takeoff so editor changes affect the next jump.
+            const float jump_speed = calculateJumpInitialSpeed(m_motor_res, gravity);
+            if (jump_speed > 0.f && ((unsigned int)GameCommand::jump & command))
             {
                 m_jump_state                  = JumpState::rising;
-                m_vertical_move_speed         = Math::sqrt(m_motor_res.m_jump_height * 2 * gravity);
+                m_vertical_move_speed         = jump_speed;
                 m_jump_horizontal_speed_ratio = m_move_speed_ratio;
             }
             else

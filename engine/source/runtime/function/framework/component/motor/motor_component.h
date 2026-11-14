@@ -20,6 +20,7 @@ namespace Piccolo
         falling
     };
 
+    // Converts input into desired motion and updates jump state from controller contacts.
     REFLECTION_TYPE(MotorComponent)
     CLASS(MotorComponent : public Component, WhiteListFields,WhiteListMethods)
     {
@@ -33,6 +34,9 @@ namespace Piccolo
 
         void tick(float delta_time) override;
         void tickPlayerMotor(float delta_time);
+
+        // Resolve the selected authoring mode into a nonnegative launch speed.
+        static float calculateJumpInitialSpeed(const MotorComponentRes& resource, float gravity);
 
         const Vector3& getTargetPosition() const { return m_target_position; }
 

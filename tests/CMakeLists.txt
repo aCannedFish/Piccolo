@@ -7,3 +7,7 @@ set_tests_properties(PiccoloAnimationTests PROPERTIES WORKING_DIRECTORY "${PICCO
 add_executable(PiccoloControllerTests controller_tests.cpp)
 target_link_libraries(PiccoloControllerTests PRIVATE PiccoloRuntime)
 add_test(NAME PiccoloControllerTests COMMAND PiccoloControllerTests)
+
+add_executable(PiccoloMotorTests motor_tests.cpp)
+target_link_libraries(PiccoloMotorTests PRIVATE PiccoloRuntime)
+add_test(NAME PiccoloMotorTests COMMAND PiccoloMotorTests)

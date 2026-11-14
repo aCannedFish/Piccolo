@@ -33,6 +33,7 @@ namespace Piccolo
         Capsule m_capsule_shape;
     };
 
+    // Editable movement parameters. Height mode keeps existing serialized assets compatible.
     REFLECTION_TYPE(MotorComponentRes)
     CLASS(MotorComponentRes, Fields)
     {
@@ -44,6 +45,8 @@ namespace Piccolo
 
         float m_move_speed { 0.f};
         float m_jump_height {0.f};
+        bool m_use_jump_initial_speed {false};
+        float m_jump_initial_speed {4.5f}; // Metres per second along the world Z axis.
         float m_max_move_speed_ratio { 0.f};
         float m_max_sprint_speed_ratio { 0.f};
         float m_move_acceleration {0.f};
